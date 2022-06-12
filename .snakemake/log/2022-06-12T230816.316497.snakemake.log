@@ -1,0 +1,26 @@
+Building DAG of jobs...
+Using shell: /bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job stats:
+job                      count    min threads    max threads
+---------------------  -------  -------------  -------------
+RNALalifold                  1              1              1
+all                          1              1              1
+move_RNALalifold_data        1              1              1
+total                        3              1              1
+
+Select jobs to execute...
+
+[Sun Jun 12 23:08:16 2022]
+rule RNALalifold:
+    input: data/aln1.stk
+    output: Lalifold/100/RNALalifold.out, Lalifold/100/RNALalifold.err, Lalifold/100/RC_0001.stk
+    jobid: 2
+    reason: Missing output files: Lalifold/100/RNALalifold.err, Lalifold/100/RC_0001.stk, Lalifold/100/RNALalifold.out
+    wildcards: wlen=100
+    resources: tmpdir=/var/folders/3g/zrpm8s3x71g2qzry1_lz0b600000gp/T
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2022-06-12T230816.316497.snakemake.log

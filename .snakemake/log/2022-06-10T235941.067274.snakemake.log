@@ -1,0 +1,25 @@
+Building DAG of jobs...
+Using shell: /bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job stats:
+job            count    min threads    max threads
+-----------  -------  -------------  -------------
+RNALalifold        2              1              1
+all                1              1              1
+total              3              1              1
+
+Select jobs to execute...
+
+[Fri Jun 10 23:59:41 2022]
+rule RNALalifold:
+    input: data/aln1.stk
+    output: Lalifold-100/split/RC_0001.stk
+    log: Lalifold-100/split/RNALalifold.out, Lalifold-100/split/RNALalifold.err
+    jobid: 1
+    reason: Missing output files: Lalifold-100/split/RC_0001.stk
+    wildcards: wlen=100/split
+    resources: tmpdir=/var/folders/3g/zrpm8s3x71g2qzry1_lz0b600000gp/T
+
+RuleException in line 23 of /Users/mtw/Work/RNAConSnake/Snakefile:
+NameError: The name 'wlen' is unknown in this context. Did you mean 'wildcards.wlen'?

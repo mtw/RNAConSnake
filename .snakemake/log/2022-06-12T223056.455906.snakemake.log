@@ -1,0 +1,2 @@
+SyntaxError in line 47 of /Users/mtw/Work/RNAConSnake/Snakefile:
+No rule keywords allowed after run/shell/script/notebook/wrapper/template_engine/cwl in rule RNALalifold. (Snakefile, line 47)

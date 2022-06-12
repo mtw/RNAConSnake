@@ -1,0 +1,3 @@
+WildcardError in line 12 of /Users/mtw/Work/RNAConSnake/Snakefile:
+No values given for wildcard 'wlen,\\d+'.
+  File "/Users/mtw/Work/RNAConSnake/Snakefile", line 12, in <module>
