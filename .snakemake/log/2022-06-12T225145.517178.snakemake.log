@@ -1,3 +1,0 @@
-AttributeError in line 52 of /Users/mtw/Work/RNAConSnake/Snakefile:
-'Namedlist' object has no attribute 'multistk'
-  File "/Users/mtw/Work/RNAConSnake/Snakefile", line 52, in <module>

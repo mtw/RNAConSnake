@@ -1,3 +1,0 @@
-WildcardError in line 19 of /Users/mtw/Work/RNAConSnake/Snakefile:
-No values given for wildcard 'filedir'.
-  File "/Users/mtw/Work/RNAConSnake/Snakefile", line 19, in <module>

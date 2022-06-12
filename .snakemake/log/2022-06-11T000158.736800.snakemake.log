@@ -1,6 +1,0 @@
-Building DAG of jobs...
-MissingInputException in line 8 of /Users/mtw/Work/RNAConSnake/Snakefile:
-Missing input files for rule all:
-    affected files:
-        Lalifold-150/split/RC_0001.stk
-        Lalifold-100/split/RC_0001.stk
