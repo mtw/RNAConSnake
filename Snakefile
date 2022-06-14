@@ -48,16 +48,16 @@ rule RNALalifold:
          mv RC_{wildcards.wlen}_0001.stk Lalifold/{wildcards.wlen}/
         """
 
-rule move_RNALalifold_data:
-    input:
-        stdout = "Lalifold/{wlen}/RNALalifold.out",
-        stderr = "Lalifold/{wlen}/RNALalifold.err",
-    output:
-        stdout = "Lalifold/{wlen}/split/RNALalifold.out",
-        stderr = "Lalifold/{wlen}/split/RNALalifold.err",
-    run:
-        shell("mv {input.stdout} {output.stdout}")
-        shell("mv {input.stderr} {output.stderr}")
+#rule move_RNALalifold_data:
+#    input:
+#        stdout = "Lalifold/{wlen}/RNALalifold.out",
+#        stderr = "Lalifold/{wlen}/RNALalifold.err",
+#    output:
+#        stdout = "Lalifold/{wlen}/split/RNALalifold.out",
+#        stderr = "Lalifold/{wlen}/split/RNALalifold.err",
+#    run:
+#        shell("mv {input.stdout} {output.stdout}")
+#        shell("mv {input.stderr} {output.stderr}")
 
 rule move_RNALalifold_stk:
     input:
