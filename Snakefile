@@ -2,6 +2,8 @@ configfile: "config.yaml"
 FULLALN = ["aln1"]
 MAXBPSPAN = [100,200]
 
+
+
 #def calc_EPS_cols(alilen):
 #    return alilen+10
 
@@ -9,8 +11,6 @@ wildcard_constraints:
     wlen="\d+"
 
 rule all:
-#    input:
-#        stk=expand("data/{sample}.stk",sample=FULLALN)
     input:
        expand("Lalifold/{wlen}/split/split.out",wlen=MAXBPSPAN),
 #        expand("Lalifold/{wlen}/split/RC_0001.stk",wlen=MAXBPSPAN)
@@ -20,7 +20,6 @@ rule filedir:
         lalifold_prefix = config["lalifold_base"],
         lalifold_stk = "RC_0001.stk",
         split_dir = "split",
-
 
 filedir = rules.filedir.params
 
@@ -80,3 +79,27 @@ rule split_stockholm:
         shell("split_stockholm.pl -a {input} > {log.out} 2> {log.err}")
         shell("mv *stk Lalifold/{wildcards.wlen}/split/")
         shell("rm {input}")
+
+
+SPLITSTKS = glob_wildcard("Lalifold/{wlen}/split/RC_{wlen}_aln_{from}_{to}.stk")
+W = SPLITSTKS.wlen
+F = SPLITSTKS.from
+T = SPLITSTKS.to
+
+rule remove_gaps:
+    input:
+        expand("Lalifold/{wlen}/split/RC_{wlen}_0001_aln_{from}_{to.stk",wlen=W,from=F,to=T)
+    output:
+        remgap = "Lalifold/{wlen}/split/RC_{wlen}_0001_aln_{from}_{to}.remgap.stk",
+    #    done = "Lalifold/{wlen}/split/
+#    run:
+#        for f in input:
+#            print(f)
+    shell:
+        """
+        remove_gaponly.pl               \
+            -a {input}                  \
+            -i stockholm                \
+            -r 0.5                      \
+            > {output} 2> /dev/null
+        """
