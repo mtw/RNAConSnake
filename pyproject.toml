@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rnaconsnake"
+version = "0.1.0"
+description = "RNAConSnake Snakemake workflow and helper tools"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "Michael T. Wolfinger"},
+]
+dependencies = [
+  "snakemake>=8,<10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
+
+[project.scripts]
+rnaconsnake-run = "rnaconsnake.cli:main"
+rnaconsnake-split-stockholm = "rnaconsnake.tools.split_stockholm:main"
+rnaconsnake-remove-gaponly = "rnaconsnake.tools.remove_gaponly:main"
+rnaconsnake-strip-aln = "rnaconsnake.tools.strip_aln:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rnaconsnake = ["workflow/snakefile", "workflow/config.yaml"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v"

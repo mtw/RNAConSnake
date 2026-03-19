@@ -1,0 +1,8 @@
+# STOCKHOLM 1.0
+#=GF ID rec2
+#=GF AC acc2
+dup1 AAAA
+dup2 AAAA
+#=GR dup1 PP 9999
+#=GR dup2 PP 9999
+//

@@ -1,2 +1,9 @@
 .snakemake/*
 Lalifold/
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+generated_files/

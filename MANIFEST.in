@@ -1,0 +1,4 @@
+include snakefile
+include config.yaml
+include LICENSE
+include README.md

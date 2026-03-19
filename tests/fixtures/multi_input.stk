@@ -1,0 +1,15 @@
+# STOCKHOLM 1.0
+#=GF ID rec1
+seq1 AC-G
+seq2 ----
+seq3 A--G
+#=GC SS_cons <<..
+//
+# STOCKHOLM 1.0
+#=GF ID rec2
+#=GF AC acc2
+dup1 AAAA
+dup2 AAAA
+#=GR dup1 PP 9999
+#=GR dup2 PP 9999
+//
