@@ -16,6 +16,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-i", "--infmt", default="clustalw", help="Input alignment format")
     parser.add_argument("-o", "--outfmt", help="Output alignment format")
     parser.add_argument("-r", "--gapratio", type=float, default=1.0, help="Maximum allowed gap fraction")
+    parser.add_argument(
+        "-n",
+        "--max-n",
+        type=int,
+        default=0,
+        help="Maximum allowed count of N/n characters per sequence",
+    )
     return parser.parse_args()
 
 
@@ -28,6 +35,9 @@ def main() -> int:
         return 2
     if not (0 <= args.gapratio <= 1):
         print("gap ratio parameter must be 0 <= r <= 1", file=sys.stderr)
+        return 2
+    if args.max_n < 0:
+        print("max-n parameter must be >= 0", file=sys.stderr)
         return 2
 
     records = parse_stockholm_records(args.aln)
@@ -42,6 +52,9 @@ def main() -> int:
     for name in record.seq_order:
         seq = record.seqs[name]
         if seq == gap_string:
+            continue
+        n_count = seq.count("N") + seq.count("n")
+        if n_count > args.max_n:
             continue
         gap_count = seq.count("-")
         if gap_count <= args.gapratio * length:

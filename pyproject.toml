@@ -14,6 +14,7 @@ authors = [
 ]
 dependencies = [
   "snakemake>=8,<10",
+  "tqdm>=4,<5",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,7 @@ rnaconsnake-run = "rnaconsnake.cli:main"
 rnaconsnake-split-stockholm = "rnaconsnake.tools.split_stockholm:main"
 rnaconsnake-remove-gaponly = "rnaconsnake.tools.remove_gaponly:main"
 rnaconsnake-strip-aln = "rnaconsnake.tools.strip_aln:main"
+rnaconsnake-alifold-maxcovar = "rnaconsnake.tools.alifold_maxcovar:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

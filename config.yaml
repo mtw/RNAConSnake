@@ -1,1 +1,34 @@
 lalifold_base: Lalifold
+maxbpspan:
+  - 100
+  - 200
+lalifold_threads: 1
+remove_gaponly_gapratio: 0.5
+remove_gaponly_max_n: 0
+
+do_cm: false
+do_locarnate: false
+do_png: true
+do_rscape: false
+
+cm_rnaz_prob_threshold: 0.9
+cm_alifoldz_threshold: -2.0
+
+tools:
+  rnalalifold: RNALalifold
+  remove_gaponly: python3 -m rnaconsnake.tools.remove_gaponly
+  strip_aln: python3 -m rnaconsnake.tools.strip_aln
+  legacy_postprocess: python3 -m rnaconsnake.tools.legacy_postprocess
+  eslreformat: esl-reformat
+  rnaz: RNAz
+  alifoldz: alifoldz.pl
+  rnaalifold: RNAalifold
+  ps2eps: ps2eps
+  epstopdf: epstopdf
+  refold: refold.pl
+  rnafold: RNAfold
+  rscape: R-scape
+  alifoldmaxcovar: python3 -m rnaconsnake.tools.alifold_maxcovar
+  magick: magick
+  cmbuild: cmbuild
+  cmcalibrate: cmcalibrate

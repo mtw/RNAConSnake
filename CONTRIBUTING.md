@@ -22,7 +22,38 @@ rnaconsnake-run --check-deps
 If `RNALalifold` is available on `PATH`, you can also run the local workflow:
 
 ```bash
-sh XFILE.sh
+sh XFILE.sh /path/to/input.stk --output-dir /path/to/run_dir
+```
+
+You can also point the packaged CLI at an arbitrary Stockholm input:
+
+```bash
+rnaconsnake-run --input-alignment /path/to/input.stk --cores all
+```
+
+To write outputs into a dedicated run directory:
+
+```bash
+rnaconsnake-run --input-alignment /path/to/input.stk --output-dir /path/to/run_dir --cores all
+```
+
+To override `maxbpspan` from the CLI:
+
+```bash
+rnaconsnake-run --input-alignment /path/to/input.stk --maxbpspan 150 --maxbpspan 250 --cores all
+```
+
+To enable optional `R-scape` analysis:
+
+```bash
+rnaconsnake-run --input-alignment /path/to/input.stk --rscape --cores all
+rnaconsnake-run --check-deps --rscape
+```
+
+If you want to reuse existing outputs without rerunning rules just because the workflow code changed:
+
+```bash
+rnaconsnake-run --conservative --cores all
 ```
 
 ## Make Targets
@@ -33,7 +64,7 @@ make install
 make test
 make check-deps
 make dist
-make run
+make run INPUT=/path/to/input.stk OUTPUT=/path/to/run_dir
 ```
 
 ## Notes

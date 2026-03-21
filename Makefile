@@ -2,7 +2,7 @@ PYTHON ?= python3
 VENV ?= .venv
 ACTIVATE = . $(VENV)/bin/activate
 
-.PHONY: venv install test run check-deps dist clean
+.PHONY: venv install test run check-deps dist clean clean-data
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -18,10 +18,14 @@ dist:
 	$(ACTIVATE) && python -m build
 
 run:
-	$(ACTIVATE) && sh XFILE.sh
+	@if [ -z "$(INPUT)" ]; then echo "Usage: make run INPUT=/path/to/input.stk"; exit 2; fi
+	$(ACTIVATE) && sh XFILE.sh "$(INPUT)" $(if $(OUTPUT),--output-dir "$(OUTPUT)")
 
 check-deps:
 	$(ACTIVATE) && rnaconsnake-run --check-deps
+
+clean-data:
+	$(ACTIVATE) && snakemake --cores 1 clean
 
 clean:
 	rm -rf $(VENV) build dist *.egg-info
