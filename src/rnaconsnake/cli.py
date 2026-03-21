@@ -224,12 +224,12 @@ def main() -> int:
         return 0
     if args.check_deps:
         return check_dependencies(include_rscape=args.rscape)
-    dep_status = check_dependencies(include_rscape=args.rscape)
-    if dep_status != 0:
-        return dep_status
     if not args.input_alignment:
         print("Missing required --input-alignment /path/to/input.stk", file=sys.stderr)
         return 2
+    dep_status = check_dependencies(include_rscape=args.rscape)
+    if dep_status != 0:
+        return dep_status
 
     snakefile, default_configfile = resolve_workflow_paths(args.snakefile)
     env = os.environ.copy()

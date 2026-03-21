@@ -156,6 +156,14 @@ print(">fake")
 print("ACGUACGU")
 print("<<<<....>>>> (-1.0)")
 """,
+        "magick": """\
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+out = Path(sys.argv[-1])
+out.write_text("PNG-FAKE\\n", encoding="utf-8")
+""",
         "R-scape": """\
 #!/usr/bin/env python3
 import sys
