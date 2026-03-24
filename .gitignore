@@ -1,9 +1,10 @@
 .snakemake/*
-Lalifold/
 .venv/
 __pycache__/
 *.pyc
+.DS_Store
 build/
 dist/
 *.egg-info/
-generated_files/
+PRIVATE/
+**/.DS_Store

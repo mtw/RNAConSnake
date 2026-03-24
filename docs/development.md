@@ -22,6 +22,8 @@ There are two workflow entry points in the repository:
 
 The packaged CLI `rnaconsnake-run` invokes workflow files copied from those root files at build time. In editable development installs, the CLI falls back to the root workflow files directly.
 
+For repository-local use without shell-activating a virtual environment, the root launcher [`rnaconsnake-run`](../rnaconsnake-run) executes `python -m rnaconsnake.cli` with `PYTHONPATH=src` and automatically prefers `./.venv/bin/python` when it exists.
+
 Important preprocessing knobs in [`config.yaml`](../config.yaml):
 
 - `remove_gaponly_gapratio`
@@ -36,7 +38,7 @@ Important preprocessing knobs in [`config.yaml`](../config.yaml):
 
 ```bash
 pytest -v
-sh XFILE.sh /path/to/input.stk --output-dir /path/to/run_dir
+rnaconsnake-run --input-alignment /path/to/input.stk --output-dir /path/to/run_dir
 rnaconsnake-run --check-deps
 rnaconsnake-run --version
 ```
@@ -54,14 +56,26 @@ rnaconsnake-run --input-alignment /path/to/input.stk --rscape --cores all
 rnaconsnake-run --check-deps --rscape
 ```
 
-If you prefer the convenience targets:
+RNAz defaults to `-d -n`, so alignment shuffling is disabled unless explicitly requested. To allow shuffling for a run:
 
 ```bash
-make venv
-make install
-make test
-make check-deps
-make run INPUT=/path/to/input.stk OUTPUT=/path/to/run_dir
+rnaconsnake-run --input-alignment /path/to/input.stk --rnaz-shuffle --cores all
+```
+
+To inspect which external tool commands RNAConSnake is configured to use, and where their executables resolve on the current machine, run:
+
+```bash
+rnaconsnake-run --show-tool-paths
+```
+
+Structured export can be triggered from the main CLI after a successful workflow run:
+
+```bash
+rnaconsnake-run \
+  --input-alignment /path/to/input.stk \
+  --output-dir /path/to/run_dir \
+  --export-bundle /path/to/export_bundle \
+  --cores all
 ```
 
 ## Tests And Fixtures
@@ -76,6 +90,21 @@ Fixtures are split into two groups:
 The real-derived fixtures are intended to stay small enough for CI while still guarding against formatting and behavior regressions in the Stockholm helper tools.
 
 The suite also includes an end-to-end Snakemake smoke test that stubs the external workflow toolchain with temporary fake executables on `PATH`. That keeps CI independent of the real binaries while still exercising the packaged workflow DAG.
+
+To verify that two completed runs generated and processed the same deterministic candidate set from the same input alignment, run:
+
+```bash
+python -m rnaconsnake.tools.verify_run_consistency /path/to/run_a /path/to/run_b
+```
+
+This checks:
+- `Lalifold/len_*/RC_*_0001.stk`
+- split manifests and per-candidate split Stockholm files
+- cleaned alignment manifests and per-candidate files under `generated_files/stk`
+
+It deliberately does not compare stochastic downstream metrics such as `alifoldz` z-scores.
+
+RNAConSnake should remain the scientific computation and export layer only. Any future HTML browser UI should remain outside the scope of this repository.
 
 ## Shipping Model
 

@@ -6,9 +6,11 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-24
+
 ### Added
 - Installable Python package via `pyproject.toml`
-- MIT `LICENSE` file
+- AGPL-3.0-or-later `LICENSE` file
 - Packaged workflow runner CLI: `rnaconsnake-run`
 - Python replacements for the former Perl helper tools
 - Python helper module for legacy post-processing metric extraction and summary generation
@@ -22,10 +24,10 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 
 ### Changed
 - Workflow helper tools now run via packaged Python modules
-- Snakemake workflow now implements the full legacy `pp_RNALalifold.sh` post-processing chain
+- Snakemake workflow now implements the full legacy post-processing chain
 - Repository workflow file is now tracked as lowercase `snakefile`
 - Root `snakefile` and `config.yaml` are now the workflow source of truth for packaging
-- Optional post-processing helper moved to `scripts/pp_RNALalifold.sh`
+- Optional shell-based post-processing helper retained outside the default packaged runtime interface
 - ViennaRNA and legacy post-processing commands remain external runtime dependencies
 
 ## [0.1.0] - 2026-03-19
@@ -34,4 +36,4 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - Initial packaged release of RNAConSnake
 - Snakemake workflow distribution with Python helper tools
 - Editable-install developer workflow
-- Release checklist and Makefile targets
+- Release checklist and local developer command guidance

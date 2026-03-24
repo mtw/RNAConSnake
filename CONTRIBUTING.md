@@ -22,7 +22,7 @@ rnaconsnake-run --check-deps
 If `RNALalifold` is available on `PATH`, you can also run the local workflow:
 
 ```bash
-sh XFILE.sh /path/to/input.stk --output-dir /path/to/run_dir
+rnaconsnake-run --input-alignment /path/to/input.stk --output-dir /path/to/run_dir
 ```
 
 You can also point the packaged CLI at an arbitrary Stockholm input:
@@ -56,15 +56,11 @@ If you want to reuse existing outputs without rerunning rules just because the w
 rnaconsnake-run --conservative --cores all
 ```
 
-## Make Targets
+## Packaging
 
 ```bash
-make venv
-make install
-make test
-make check-deps
-make dist
-make run INPUT=/path/to/input.stk OUTPUT=/path/to/run_dir
+source .venv/bin/activate
+python -m build
 ```
 
 ## Notes

@@ -1,173 +1,118 @@
-import json
 import os
-import shlex
 import shutil
 import subprocess
 from pathlib import Path
 
+from rnaconsnake.workflow_helpers import (
+    WorkflowSettings,
+    candidate_paths,
+    candidate_outputs_for_manifest,
+    initial_alignment_input as required_initial_alignment_input,
+    normalize_rnaalifold_side_output,
+    read_json,
+    read_manifest,
+    run_checked,
+    split_file_basenames_from_manifest,
+    write_json,
+    write_manifest,
+)
 from snakemake.io import expand
 
 
 configfile: "config.yaml"
 
-INPUT_ALIGNMENT = config.get("input_alignment")
-MAXBPSPAN = config.get("maxbpspan", [100, 200])
-LALIFOLD_THREADS = config.get("lalifold_threads", 1)
-REMOVE_GAPONLY_GAPRATIO = float(config.get("remove_gaponly_gapratio", 0.5))
-REMOVE_GAPONLY_MAX_N = int(config.get("remove_gaponly_max_n", 0))
-DO_CM = config.get("do_cm", False)
-DO_LOCARNATE = config.get("do_locarnate", False)
-DO_PNG = config.get("do_png", True)
-DO_RSCAPE = config.get("do_rscape", False)
-CM_RNAZ_THRESHOLD = float(config.get("cm_rnaz_prob_threshold", 0.9))
-CM_ALIFOLDZ_THRESHOLD = float(config.get("cm_alifoldz_threshold", -2.0))
-TOOLS = config.get("tools", {})
+SETTINGS = WorkflowSettings.from_config(config)
+INPUT_ALIGNMENT = SETTINGS.input_alignment
+MAXBPSPAN = SETTINGS.maxbpspan
+LALIFOLD_THREADS = SETTINGS.lalifold_threads
+REMOVE_GAPONLY_GAPRATIO = SETTINGS.remove_gaponly_gapratio
+REMOVE_GAPONLY_MAX_N = SETTINGS.remove_gaponly_max_n
+DO_CM = SETTINGS.do_cm
+DO_LOCARNATE = SETTINGS.do_locarnate
+DO_PNG = SETTINGS.do_png
+DO_RSCAPE = SETTINGS.do_rscape
+RNAZ_NO_SHUFFLE = SETTINGS.rnaz_no_shuffle
+CM_RNAZ_THRESHOLD = SETTINGS.cm_rnaz_threshold
+CM_ALIFOLDZ_THRESHOLD = SETTINGS.cm_alifoldz_threshold
 
 wildcard_constraints:
     wlen=r"\d+"
 
 
 def command_tokens(name, default):
-    return shlex.split(str(TOOLS.get(name, default)))
-
-
-def read_manifest(path):
-    with open(path, encoding="utf-8") as handle:
-        return [line.strip() for line in handle if line.strip()]
-
-
-def write_manifest(path, entries):
-    with open(path, "w", encoding="utf-8") as handle:
-        for entry in entries:
-            handle.write(f"{entry}\n")
-
-
-def write_json(path, payload):
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-
-
-def read_json(path):
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def run_checked(cmd, stdin_path=None, stdout_path=None, stderr_path=None, cwd=None):
-    stdin_handle = open(stdin_path, encoding="utf-8") if stdin_path else None
-    stdout_handle = open(stdout_path, "w", encoding="utf-8") if stdout_path else None
-    stderr_handle = open(stderr_path, "w", encoding="utf-8") if stderr_path else None
-    try:
-        subprocess.run(
-            cmd,
-            stdin=stdin_handle,
-            stdout=stdout_handle,
-            stderr=stderr_handle,
-            cwd=cwd,
-            text=True,
-            check=True,
-        )
-    finally:
-        if stdin_handle:
-            stdin_handle.close()
-        if stdout_handle:
-            stdout_handle.close()
-        if stderr_handle:
-            stderr_handle.close()
-
-
-def normalize_rnaalifold_side_output(outdir, canonical_path, suffix):
-    canonical = Path(canonical_path)
-    if canonical.exists():
-        return
-
-    prefix = canonical.name[: -len(suffix)]
-    candidates = sorted(outdir.glob(f"{prefix}_*{suffix}"))
-    if len(candidates) == 1:
-        candidates[0].rename(canonical)
-        return
-    if len(candidates) > 1:
-        raise FileExistsError(
-            f"Multiple RNAalifold outputs matched {canonical.name}: "
-            + ", ".join(candidate.name for candidate in candidates)
-        )
+    return SETTINGS.command_tokens(name, default)
 
 
 def split_file_basenames(wildcards):
     manifest = checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1]
-    return [file[:-4] for file in read_manifest(manifest)]
+    return split_file_basenames_from_manifest(manifest)
 
 
 def initial_alignment_input(wildcards):
-    if not INPUT_ALIGNMENT:
-        raise ValueError("Missing required config value 'input_alignment'. Use rnaconsnake-run --input-alignment /path/to/input.stk")
-    return [str(INPUT_ALIGNMENT)]
+    return required_initial_alignment_input(INPUT_ALIGNMENT)
 
 
 def orig_outputs(wildcards):
-    return expand(
-        "generated_files/orig/len_{wlen}/{file}.orig.stk",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.orig,
     )
 
 
 def remgap_outputs(wildcards):
-    return expand(
-        "generated_files/remgap/len_{wlen}/{file}_remgap.stk",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.remgap,
     )
 
 
 def strip_outputs(wildcards):
-    return expand(
-        "generated_files/strip/len_{wlen}/{file}_stripped.stk",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.strip,
     )
 
 
 def stk_outputs(wildcards):
-    return expand(
-        "generated_files/stk/len_{wlen}/{file}.stk",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.stk,
     )
 
 
 def cm_status_outputs(wildcards):
-    return expand(
-        "generated_files/cm/len_{wlen}/{file}.cm.status.json",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.cm_status_json,
     )
 
 
 def summary_json_outputs(wildcards):
-    return expand(
-        "generated_files/summary/len_{wlen}/{file}.summary.json",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.summary_json,
     )
 
 
 def rscape_outputs(wildcards):
-    return expand(
-        "generated_files/rscape/len_{wlen}/{file}.rscape.json",
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: paths.rscape_json,
     )
 
 
 def png_outputs(wildcards):
-    return expand(
-        [
-            "generated_files/png/len_{wlen}/{file}_aln.png",
-            "generated_files/png/len_{wlen}/{file}_ss.png",
-        ],
-        wlen=wildcards.wlen,
-        file=split_file_basenames(wildcards),
+    return candidate_outputs_for_manifest(
+        checkpoints.split_stockholm.get(wlen=wildcards.wlen).output[1],
+        wildcards.wlen,
+        lambda paths: [paths.png_aln, paths.png_ss],
     )
 
 
@@ -181,10 +126,9 @@ rule all:
         expand("generated_files/stk/len_{wlen}/manifest.txt", wlen=MAXBPSPAN),
         expand("generated_files/rscape/len_{wlen}/manifest.txt", wlen=MAXBPSPAN),
         expand("generated_files/cm/len_{wlen}/manifest.txt", wlen=MAXBPSPAN),
-        expand("generated_files/summary/len_{wlen}/pp_RNALalifold.log", wlen=MAXBPSPAN),
-        expand("generated_files/summary/len_{wlen}/pp_RNALalifold.log.csv", wlen=MAXBPSPAN),
-        expand("generated_files/summary/len_{wlen}/pp_RNALalifold.md", wlen=MAXBPSPAN),
-        expand("generated_files/summary/len_{wlen}/pp_RNALalifold.html", wlen=MAXBPSPAN),
+        expand("generated_files/summary/len_{wlen}/RNAConSnake.log", wlen=MAXBPSPAN),
+        expand("generated_files/summary/len_{wlen}/RNAConSnake.log.csv", wlen=MAXBPSPAN),
+        expand("generated_files/summary/len_{wlen}/RNAConSnake.md", wlen=MAXBPSPAN),
         expand("generated_files/png/len_{wlen}/manifest.txt", wlen=MAXBPSPAN) if DO_PNG else []
 
 
@@ -196,7 +140,7 @@ rule RNALalifold:
         stderr="Lalifold/len_{wlen}/RNALalifold.err",
         multistk="Lalifold/len_{wlen}/RC_{wlen}_0001.stk"
     params:
-        cmd=TOOLS.get("rnalalifold", "RNALalifold"),
+        cmd=SETTINGS.tools.get("rnalalifold", "RNALalifold"),
         input_abs=lambda wildcards, input: os.path.abspath(input[0])
     threads:
         LALIFOLD_THREADS
@@ -247,24 +191,25 @@ rule preprocess_alignment_file:
     threads:
         1
     run:
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
         Path(output.orig).parent.mkdir(parents=True, exist_ok=True)
         Path(output.remgap).parent.mkdir(parents=True, exist_ok=True)
         Path(output.strip).parent.mkdir(parents=True, exist_ok=True)
         Path(output.stk).parent.mkdir(parents=True, exist_ok=True)
 
-        run_checked(["cp", input[0], output.orig])
+        run_checked(["cp", input[0], paths.orig])
         run_checked(
             command_tokens("remove_gaponly", "python3 -m rnaconsnake.tools.remove_gaponly")
             + ["-a", input[0], "-i", "stockholm", "-r", str(REMOVE_GAPONLY_GAPRATIO), "-n", str(REMOVE_GAPONLY_MAX_N)],
-            stdout_path=output.remgap,
+            stdout_path=paths.remgap,
             stderr_path=os.devnull,
         )
         run_checked(
             command_tokens("strip_aln", "python3 -m rnaconsnake.tools.strip_aln")
-            + ["-a", output.remgap, "-f", "S", "--nosingle"],
-            stdout_path=output.strip,
+            + ["-a", paths.remgap, "-f", "S", "--nosingle"],
+            stdout_path=paths.strip,
         )
-        run_checked(["cp", output.strip, output.stk])
+        run_checked(["cp", paths.strip, paths.stk])
 
 
 rule orig_manifest:
@@ -317,26 +262,29 @@ rule analyze_alignment_file:
         alifoldz_txt="generated_files/alifoldz/len_{wlen}/{file}.alifoldz.txt",
         alifoldz_metrics="generated_files/alifoldz/len_{wlen}/{file}.alifoldz.json"
     run:
-        Path(output.aln).parent.mkdir(parents=True, exist_ok=True)
-        Path(output.rnaz_txt).parent.mkdir(parents=True, exist_ok=True)
-        Path(output.alifoldz_txt).parent.mkdir(parents=True, exist_ok=True)
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        Path(paths.aln).parent.mkdir(parents=True, exist_ok=True)
+        Path(paths.rnaz_txt).parent.mkdir(parents=True, exist_ok=True)
+        Path(paths.alifoldz_txt).parent.mkdir(parents=True, exist_ok=True)
 
         run_checked(
             command_tokens("eslreformat", "esl-reformat") + ["clustal", input[0]],
-            stdout_path=output.aln,
+            stdout_path=paths.aln,
         )
 
         cmd = command_tokens("rnaz", "RNAz") + ["-d"]
+        if RNAZ_NO_SHUFFLE:
+            cmd.append("-n")
         if DO_LOCARNATE:
             cmd.append("-l")
-        cmd.append(output.aln)
-        run_checked(cmd, stdout_path=output.rnaz_txt)
+        cmd.append(paths.aln)
+        run_checked(cmd, stdout_path=paths.rnaz_txt)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
-            + ["extract-rnaz", "--input", output.rnaz_txt, "--output", output.rnaz_metrics]
+            + ["extract-rnaz", "--input", paths.rnaz_txt, "--output", paths.rnaz_json]
         )
 
-        with open(output.aln, encoding="utf-8") as stdin_handle:
+        with open(paths.aln, encoding="utf-8") as stdin_handle:
             result = subprocess.run(
                 command_tokens("alifoldz", "alifoldz.pl") + ["-f", "-t", "0.0"],
                 stdin=stdin_handle,
@@ -345,7 +293,7 @@ rule analyze_alignment_file:
                 check=False,
             )
 
-        with open(output.alifoldz_txt, "w", encoding="utf-8") as handle:
+        with open(paths.alifoldz_txt, "w", encoding="utf-8") as handle:
             if result.stdout:
                 handle.write(result.stdout)
             if result.returncode != 0:
@@ -359,10 +307,10 @@ rule analyze_alignment_file:
         if result.returncode == 0:
             run_checked(
                 command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
-                + ["extract-alifoldz", "--input", output.alifoldz_txt, "--output", output.alifoldz_metrics]
+                + ["extract-alifoldz", "--input", paths.alifoldz_txt, "--output", paths.alifoldz_json]
             )
         else:
-            write_json(output.alifoldz_metrics, {"alifoldzscore": ""})
+            write_json(paths.alifoldz_json, {"alifoldzscore": "0.0"})
 
 
 rule run_post_rnaalifold_file:
@@ -380,7 +328,8 @@ rule run_post_rnaalifold_file:
         ss_eps="generated_files/rnaalifold/len_{wlen}/{file}/{file}_ss.eps",
         ss_pdf="generated_files/rnaalifold/len_{wlen}/{file}/{file}_ss.pdf"
     run:
-        outdir = Path(output.stdout).parent
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        outdir = Path(paths.rnaalifold_dir)
         outdir.mkdir(parents=True, exist_ok=True)
         run_checked(
             command_tokens("rnaalifold", "RNAalifold")
@@ -402,21 +351,36 @@ rule run_post_rnaalifold_file:
                 wildcards.file,
             ],
             stdin_path=input[0],
-            stdout_path=output.stdout,
+            stdout_path=paths.rnaalifold_stdout,
             cwd=str(outdir),
         )
+        # ViennaRNA can emit an undeclared default structure plot named
+        # "alirna.ps". It is not part of RNAConSnake's output contract.
+        for stray in [Path("alirna.ps"), outdir / "alirna.ps"]:
+            if stray.exists():
+                stray.unlink()
         default_stk = outdir / "RNAalifold_results.stk"
-        if default_stk.exists() and not Path(output.stk).exists():
-            default_stk.rename(output.stk)
-        normalize_rnaalifold_side_output(outdir, output.ali_out, "_ali.out")
-        normalize_rnaalifold_side_output(outdir, output.dp_ps, "_dp.ps")
-        normalize_rnaalifold_side_output(outdir, output.aln_ps, "_aln.ps")
-        normalize_rnaalifold_side_output(outdir, output.ss_ps, "_ss.ps")
-        run_checked(command_tokens("ps2eps", "ps2eps") + [Path(output.aln_ps).name], cwd=str(outdir))
-        run_checked(command_tokens("epstopdf", "epstopdf") + [Path(output.aln_eps).name], cwd=str(outdir))
-        run_checked(command_tokens("ps2eps", "ps2eps") + [Path(output.ss_ps).name], cwd=str(outdir))
-        run_checked(command_tokens("epstopdf", "epstopdf") + [Path(output.ss_eps).name], cwd=str(outdir))
-        for required in [output.stk, output.ali_out, output.dp_ps, output.aln_ps, output.aln_eps, output.aln_pdf, output.ss_ps, output.ss_eps, output.ss_pdf]:
+        if default_stk.exists() and not Path(paths.rnaalifold_stk).exists():
+            default_stk.rename(paths.rnaalifold_stk)
+        normalize_rnaalifold_side_output(outdir, paths.ali_out, "_ali.out")
+        normalize_rnaalifold_side_output(outdir, paths.dp_ps, "_dp.ps")
+        normalize_rnaalifold_side_output(outdir, paths.aln_ps, "_aln.ps")
+        normalize_rnaalifold_side_output(outdir, paths.ss_ps, "_ss.ps")
+        run_checked(command_tokens("ps2eps", "ps2eps") + [Path(paths.aln_ps).name], cwd=str(outdir))
+        run_checked(command_tokens("epstopdf", "epstopdf") + [Path(paths.aln_eps).name], cwd=str(outdir))
+        run_checked(command_tokens("ps2eps", "ps2eps") + [Path(paths.ss_ps).name], cwd=str(outdir))
+        run_checked(command_tokens("epstopdf", "epstopdf") + [Path(paths.ss_eps).name], cwd=str(outdir))
+        for required in [
+            paths.rnaalifold_stk,
+            paths.ali_out,
+            paths.dp_ps,
+            paths.aln_ps,
+            paths.aln_eps,
+            paths.aln_pdf,
+            paths.ss_ps,
+            paths.ss_eps,
+            paths.ss_pdf,
+        ]:
             if not Path(required).exists():
                 raise FileNotFoundError(f"Expected RNAalifold output missing: {required}")
 
@@ -429,9 +393,10 @@ rule render_pngs_file:
         aln_png="generated_files/png/len_{wlen}/{file}_aln.png",
         ss_png="generated_files/png/len_{wlen}/{file}_ss.png"
     run:
-        os.makedirs(os.path.dirname(output.aln_png), exist_ok=True)
-        run_checked(command_tokens("magick", "magick") + [input.aln_ps, output.aln_png])
-        run_checked(command_tokens("magick", "magick") + [input.ss_ps, output.ss_png])
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        os.makedirs(os.path.dirname(paths.png_aln), exist_ok=True)
+        run_checked(command_tokens("magick", "magick") + [input.aln_ps, paths.png_aln])
+        run_checked(command_tokens("magick", "magick") + [input.ss_ps, paths.png_ss])
 
 
 rule png_manifest:
@@ -527,7 +492,8 @@ rule run_maxcovar_file:
         log="generated_files/maxcovar/len_{wlen}/{file}_alifoldmaxcovar.log",
         metrics="generated_files/maxcovar/len_{wlen}/{file}.maxcovar.json"
     run:
-        os.makedirs(os.path.dirname(output.log), exist_ok=True)
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        os.makedirs(os.path.dirname(paths.maxcovar_log), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
             + [
@@ -535,9 +501,9 @@ rule run_maxcovar_file:
                 "--ali-out",
                 input[0],
                 "--log",
-                output.log,
+                paths.maxcovar_log,
                 "--output",
-                output.metrics,
+                paths.maxcovar_json,
             ]
         )
 
@@ -549,12 +515,13 @@ rule run_rscape_file:
         power="generated_files/rscape/len_{wlen}/{file}.power",
         metrics="generated_files/rscape/len_{wlen}/{file}.rscape.json"
     run:
-        os.makedirs(os.path.dirname(output.power), exist_ok=True)
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        os.makedirs(os.path.dirname(paths.rscape_power), exist_ok=True)
         if not DO_RSCAPE:
-            Path(output.power).write_text("# R-scape disabled\n", encoding="utf-8")
-            write_json(output.metrics, {"rscape_covary_count": ""})
+            Path(paths.rscape_power).write_text("# R-scape disabled\n", encoding="utf-8")
+            write_json(paths.rscape_json, {"rscape_covary_count": "NA"})
         else:
-            outdir = Path(output.power).parent
+            outdir = Path(paths.rscape_power).parent
             workdir = outdir / f".{wildcards.file}.rscape"
             workdir.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
@@ -568,35 +535,35 @@ rule run_rscape_file:
             (workdir / "rscape.stderr").write_text(result.stderr or "", encoding="utf-8")
             power_candidates = sorted(workdir.glob("*.power"))
             if len(power_candidates) == 1:
-                power_candidates[0].replace(output.power)
+                power_candidates[0].replace(paths.rscape_power)
                 run_checked(
                     command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
                     + [
                         "extract-rscape",
                         "--input",
-                        output.power,
+                        paths.rscape_power,
                         "--output",
-                        output.metrics,
+                        paths.rscape_json,
                     ]
                 )
             elif len(power_candidates) == 0:
                 stdout_text = (workdir / "rscape.stdout").read_text(encoding="utf-8") if (workdir / "rscape.stdout").exists() else ""
                 stderr_text = (workdir / "rscape.stderr").read_text(encoding="utf-8") if (workdir / "rscape.stderr").exists() else ""
-                Path(output.power).write_text(
+                Path(paths.rscape_power).write_text(
                     "# R-scape produced no .power output\n"
                     + f"# exit code: {result.returncode}\n"
                     + (stdout_text if stdout_text else "")
                     + ("\n# stderr\n" + stderr_text if stderr_text else ""),
                     encoding="utf-8",
                 )
-                write_json(output.metrics, {"rscape_covary_count": "0" if "Number of covarying pairs = 0" in stdout_text else ""})
+                write_json(paths.rscape_json, {"rscape_covary_count": "0" if "Number of covarying pairs = 0" in stdout_text else ""})
             else:
                 candidates = ", ".join(path.name for path in power_candidates)
                 raise FileNotFoundError(f"Could not uniquely identify R-scape .power output in {workdir}: {candidates}")
-            sto_pdf = outdir / f"{wildcards.file}.sto.pdf"
+            sto_pdf = Path(paths.rscape_sto_pdf)
             if sto_pdf.exists():
                 sto_pdf.unlink()
-            metrics = read_json(output.metrics)
+            metrics = read_json(paths.rscape_json)
             try:
                 covary_count = int(metrics.get("rscape_covary_count", "") or 0)
             except ValueError:
@@ -627,7 +594,8 @@ rule build_cm_file:
     output:
         "generated_files/cm/len_{wlen}/{file}.cm.status.json"
     run:
-        outdir = Path(output[0]).parent
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        outdir = Path(paths.cm_status_json).parent
         outdir.mkdir(parents=True, exist_ok=True)
 
         rnaz = read_json(input.rnaz)
@@ -651,7 +619,7 @@ rule build_cm_file:
                 build_reason = f"alifoldzscore={alifoldzscore}"
 
             if build_reason is not None:
-                cm_base = str(outdir / wildcards.file)
+                cm_base = str(outdir / paths.file)
                 run_checked(
                     command_tokens("cmbuild", "cmbuild") + [f"{cm_base}.cm", input.stk],
                     stdout_path=f"{cm_base}.cmbuild.out",
@@ -666,7 +634,7 @@ rule build_cm_file:
             else:
                 status = {"built": False, "reason": "threshold_not_met"}
 
-        write_json(output[0], status)
+        write_json(paths.cm_status_json, status)
 
 
 rule cm_manifest:
@@ -689,7 +657,8 @@ rule combine_summary_metrics_file:
     output:
         "generated_files/summary/len_{wlen}/{file}.summary.json"
     run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
+        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        os.makedirs(os.path.dirname(paths.summary_json), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
             + [
@@ -697,7 +666,7 @@ rule combine_summary_metrics_file:
                 "--wbn",
                 wildcards.file,
                 "--output",
-                output[0],
+                paths.summary_json,
                 input.rnaz,
                 input.alifoldz,
                 input.refold,
@@ -711,16 +680,15 @@ rule summary_logs:
     input:
         summary_json_outputs
     output:
-        log="generated_files/summary/len_{wlen}/pp_RNALalifold.log",
-        csv="generated_files/summary/len_{wlen}/pp_RNALalifold.log.csv",
-        markdown="generated_files/summary/len_{wlen}/pp_RNALalifold.md",
-        html="generated_files/summary/len_{wlen}/pp_RNALalifold.html"
+        log="generated_files/summary/len_{wlen}/RNAConSnake.log",
+        csv="generated_files/summary/len_{wlen}/RNAConSnake.log.csv",
+        markdown="generated_files/summary/len_{wlen}/RNAConSnake.md"
     run:
         os.makedirs(os.path.dirname(output.log), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
             + [
-                "render-reports",
+                "write-summary-outputs",
                 "--label",
                 f"len_{wildcards.wlen}",
                 "--log",
@@ -729,8 +697,6 @@ rule summary_logs:
                 output.csv,
                 "--markdown",
                 output.markdown,
-                "--html",
-                output.html,
                 *sorted(input),
             ]
         )

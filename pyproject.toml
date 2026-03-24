@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rnaconsnake"
-version = "0.1.0"
-description = "RNAConSnake Snakemake workflow and helper tools"
+version = "0.2.0"
+description = "Workflow for discovering and prioritizing locally conserved RNA secondary structure candidates"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "GNU Affero General Public License v3 or later (AGPL-3.0-or-later)"}
 authors = [
   {name = "Michael T. Wolfinger"},
 ]

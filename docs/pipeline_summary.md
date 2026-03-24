@@ -25,7 +25,7 @@ The `RNAalifold` result is subsequently reformatted and cleaned for constrained 
 
 ## Optional R-scape Analysis
 
-The workflow includes an optional `R-scape` branch that is disabled by default and can be enabled explicitly via configuration or CLI flag. When enabled, `R-scape` is run on each per-candidate `RNAalifold_results.stk` file. The pipeline parses the generated `.power` output and records the number of base pairs reported as significantly covarying. For candidates with positive covariation support, the corresponding `R-scape` structural PDF is retained for interactive inspection in the final dashboard.
+The workflow includes an optional `R-scape` branch that is disabled by default and can be enabled explicitly via configuration or CLI flag. When enabled, `R-scape` is run on each per-candidate `RNAalifold_results.stk` file. The pipeline parses the generated `.power` output and records the number of base pairs reported as significantly covarying. For candidates with positive covariation support, the corresponding `R-scape` structural PDF is retained as a scientific artifact alongside the structured summaries.
 
 ## Optional Covariance Model Construction
 
@@ -42,13 +42,13 @@ For each candidate element, the workflow aggregates the following classes of mea
 - `alifoldz` score
 - consensus and refold-derived structural descriptors
 
-These per-candidate summaries are rendered into three report formats for each `maxbpspan` run:
+These per-candidate summaries are rendered into three structured summary formats for each `maxbpspan` run:
 
+- plain text log
 - CSV
 - Markdown
-- interactive HTML
 
-The HTML report supports numeric sorting and filtering and links directly to the generated structure plots. When `R-scape` is enabled and a candidate has positive covariation support, the `R-scape` PDF can be previewed interactively from within the dashboard.
+RNAConSnake itself does not render HTML dashboards or websites. Visualization and browser-style presentation are intentionally outside the scope of this repository.
 
 ## Output Structure
 
@@ -58,7 +58,7 @@ The workflow writes all generated data into a user-selected output directory. Ma
 - `generated_files/stk/` for cleaned per-candidate Stockholm alignments
 - `generated_files/rnaalifold/` for per-candidate `RNAalifold` outputs and structure plots
 - `generated_files/rscape/` for optional `R-scape` outputs
-- `generated_files/summary/` for final summary tables and dashboards
+- `generated_files/summary/` for final summary tables and structured reports
 
 ## Intended Use
 

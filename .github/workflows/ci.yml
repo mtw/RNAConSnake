@@ -35,6 +35,11 @@ jobs:
           . .venv/bin/activate
           rnaconsnake-run --version
 
+      - name: Check tool-path diagnostic
+        run: |
+          . .venv/bin/activate
+          rnaconsnake-run --show-tool-paths
+
       - name: Check dependency reporting
         run: |
           . .venv/bin/activate
@@ -77,6 +82,11 @@ jobs:
         run: |
           . .venv/bin/activate
           rnaconsnake-run --version
+
+      - name: Smoke test installed tool-path diagnostic
+        run: |
+          . .venv/bin/activate
+          rnaconsnake-run --show-tool-paths
 
       - name: Check dependency reporting from installed CLI
         run: |

@@ -10,6 +10,7 @@ do_cm: false
 do_locarnate: false
 do_png: true
 do_rscape: false
+rnaz_no_shuffle: true
 
 cm_rnaz_prob_threshold: 0.9
 cm_alifoldz_threshold: -2.0
