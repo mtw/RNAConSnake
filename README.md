@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19210864.svg)](https://doi.org/10.5281/zenodo.19210864)
+
 # RNAConSnake
 
 RNAConSnake is a workflow for discovering and prioritizing locally conserved RNA secondary structure candidates from multiple-sequence alignments.
