@@ -7,9 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-
-def read_manifest(path: Path) -> list[str]:
-    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+from rnaconsnake.workflow_helpers import read_manifest
 
 
 def sha256_file(path: Path) -> str:

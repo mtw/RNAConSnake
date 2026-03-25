@@ -192,7 +192,6 @@ def build_parser() -> argparse.ArgumentParser:
     clean.set_defaults(func=cmd_clean_clustal)
 
     refold = sub.add_parser("extract-refold")
-    refold.add_argument("--refold-output", required=True)
     refold.add_argument("--rnaalifold-stk", required=True)
     refold.add_argument("--output", required=True)
     refold.set_defaults(func=cmd_extract_refold)

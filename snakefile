@@ -463,8 +463,6 @@ rule extract_refold_metrics_file:
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
             + [
                 "extract-refold",
-                "--refold-output",
-                input.refold,
                 "--rnaalifold-stk",
                 input.stk,
                 "--output",

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import re
 import shutil
 from dataclasses import dataclass
@@ -10,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rnaconsnake import __version__
-from rnaconsnake.workflow_helpers import SUMMARY_FIELDS
+from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, read_json, write_json
 
 FEATURE_COLUMNS = [
     "feature_id",
@@ -88,13 +87,6 @@ def sanitize_id(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
     return cleaned.strip("._-") or "dataset"
 
-
-def read_json(path: Path) -> dict[str, str]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def write_json(path: Path, payload: dict[str, object]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def write_csv(path: Path, columns: list[str], rows: list[dict[str, object]]) -> None:

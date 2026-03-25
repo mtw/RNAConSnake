@@ -16,6 +16,10 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - `candidate_paths()` wrapper removed; call sites use `CandidatePaths(...)` directly
 - Manifest rules in the snakefile now delegate to a shared `write_output_manifest` helper,
   eliminating repeated boilerplate across all seven manifest rules
+- `extract-refold` subcommand no longer accepts `--refold-output`; the argument was
+  unused after removal of `refold_firstseq`/`refold_firststruc` fields
+- `read_manifest` in `verify_run_consistency` and `read_json`/`write_json` in
+  `export_bundle` now imported from `workflow_helpers` instead of being redefined locally
 
 ## [0.2.0] - 2026-03-24
 
