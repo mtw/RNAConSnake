@@ -1,11 +1,27 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+
+
+SUMMARY_FIELDS = [
+    "wbn",
+    "nrseq",
+    "alilen",
+    "maxcovarval",
+    "maxcovarcount",
+    "rscape_covary_count",
+    "rnazprob",
+    "sci",
+    "consensus_mfe",
+    "alifoldzscore",
+    "alifold_consstruc",
+]
 
 
 @dataclass(frozen=True)
@@ -229,10 +245,10 @@ def run_checked(
     stderr_path: str | Path | None = None,
     cwd: str | Path | None = None,
 ) -> None:
-    stdin_handle = open(stdin_path, encoding="utf-8") if stdin_path else None
-    stdout_handle = open(stdout_path, "w", encoding="utf-8") if stdout_path else None
-    stderr_handle = open(stderr_path, "w", encoding="utf-8") if stderr_path else None
-    try:
+    with contextlib.ExitStack() as stack:
+        stdin_handle = stack.enter_context(open(stdin_path, encoding="utf-8")) if stdin_path else None
+        stdout_handle = stack.enter_context(open(stdout_path, "w", encoding="utf-8")) if stdout_path else None
+        stderr_handle = stack.enter_context(open(stderr_path, "w", encoding="utf-8")) if stderr_path else None
         subprocess.run(
             cmd,
             stdin=stdin_handle,
@@ -242,13 +258,6 @@ def run_checked(
             text=True,
             check=True,
         )
-    finally:
-        if stdin_handle:
-            stdin_handle.close()
-        if stdout_handle:
-            stdout_handle.close()
-        if stderr_handle:
-            stderr_handle.close()
 
 
 def normalize_rnaalifold_side_output(outdir: Path, canonical_path: str | Path, suffix: str) -> None:

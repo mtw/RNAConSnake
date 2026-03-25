@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 
 ## [Unreleased]
 
+### Changed
+- `SUMMARY_FIELDS` is now defined once in `workflow_helpers` and imported by both
+  `legacy_postprocess` and `export_bundle`, eliminating a previously diverged duplicate
+- `refold_firstseq` and `refold_firststruc` fields removed from summary outputs and export bundles
+- `run_checked` now uses `contextlib.ExitStack` for guaranteed file handle cleanup
+
 ## [0.2.0] - 2026-03-24
 
 ### Added

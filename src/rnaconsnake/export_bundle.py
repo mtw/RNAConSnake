@@ -10,23 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rnaconsnake import __version__
-
-
-SUMMARY_FIELDS = [
-    "wbn",
-    "nrseq",
-    "alilen",
-    "maxcovarval",
-    "maxcovarcount",
-    "rscape_covary_count",
-    "rnazprob",
-    "sci",
-    "consensus_mfe",
-    "alifoldzscore",
-    "refold_firstseq",
-    "refold_firststruc",
-    "alifold_consstruc",
-]
+from rnaconsnake.workflow_helpers import SUMMARY_FIELDS
 
 FEATURE_COLUMNS = [
     "feature_id",
@@ -244,8 +228,6 @@ def write_candidate_markdown(path: Path, record: SummaryRecord, candidate_row: d
                 "",
                 "## Structures",
                 "",
-                f"- Refold first sequence: `{values['refold_firstseq']}`",
-                f"- Refold first structure: `{values['refold_firststruc']}`",
                 f"- Consensus structure: `{values['alifold_consstruc']}`",
                 "",
             ]

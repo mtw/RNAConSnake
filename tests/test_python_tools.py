@@ -330,8 +330,6 @@ def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) ->
                 "sci": "0.58",
                 "consensus_mfe": "-14.10",
                 "alifoldzscore": "-3.21",
-                "refold_firstseq": "ACGU",
-                "refold_firststruc": "<<>>",
                 "alifold_consstruc": "<<>>",
             }
         )
@@ -346,7 +344,7 @@ def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) ->
         paths.split: "# STOCKHOLM 1.0\n//\n",
         paths.stk: "# STOCKHOLM 1.0\n//\n",
         paths.aln: "CLUSTAL W\n",
-        paths.refold_json: '{"refold_firstseq":"ACGU"}\n',
+        paths.refold_json: '{"alifold_consstruc": "<<>>"}\n',
         paths.aln_pdf: "%PDF-FAKE\n",
         paths.ss_pdf: "%PDF-FAKE\n",
         paths.rscape_power: "# BPAIRS observed to covary 1\n",
@@ -431,8 +429,6 @@ def test_render_reports_writes_log_csv_and_markdown(tmp_path: Path) -> None:
               "rscape_covary_count": "1",
               "rnazprob": "0.95",
               "alifoldzscore": "-3.21",
-              "refold_firstseq": "ACGU",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -463,8 +459,6 @@ def test_render_reports_writes_log_csv_and_markdown(tmp_path: Path) -> None:
     assert "rec1" in read_text(tmp_path / "RNAConSnake.log")
     assert "wbn,nrseq,alilen" in read_text(tmp_path / "RNAConSnake.log.csv")
     assert "# RNAConSnake Summary: len_100" in read_text(tmp_path / "RNAConSnake.md")
-    assert "refold_firstseq" not in read_text(tmp_path / "RNAConSnake.log.csv")
-    assert "refold_firststruc" not in read_text(tmp_path / "RNAConSnake.log.csv")
 
 
 def test_extract_rnaz_reads_probability_sci_and_consensus_mfe(tmp_path: Path) -> None:
@@ -518,8 +512,6 @@ def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path:
               "rscape_covary_count": "",
               "rnazprob": "0.5",
               "alifoldzscore": "-1.0",
-              "refold_firstseq": "AAAA",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -538,8 +530,6 @@ def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path:
               "rscape_covary_count": "",
               "rnazprob": "0.5",
               "alifoldzscore": "-2.0",
-              "refold_firstseq": "CCCC",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -558,8 +548,6 @@ def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path:
               "rscape_covary_count": "",
               "rnazprob": "0.5",
               "alifoldzscore": "-3.0",
-              "refold_firstseq": "GGGG",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -593,8 +581,6 @@ def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path:
     assert csv_lines[1].startswith("rec_b,")
     assert csv_lines[2].startswith("rec_c,")
     assert csv_lines[3].startswith("rec_a,")
-    assert "refold_firstseq" not in csv_lines[0]
-    assert "refold_firststruc" not in csv_lines[0]
 
 
 def test_legacy_postprocess_removed_render_reports_subcommand(tmp_path: Path) -> None:
@@ -926,8 +912,6 @@ def test_write_summary_outputs_preserves_rscape_zero_and_na(tmp_path: Path) -> N
               "sci": "0.58",
               "consensus_mfe": "-14.10",
               "alifoldzscore": "-3.21",
-              "refold_firstseq": "ACGU",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -948,8 +932,6 @@ def test_write_summary_outputs_preserves_rscape_zero_and_na(tmp_path: Path) -> N
               "sci": "0.58",
               "consensus_mfe": "-14.10",
               "alifoldzscore": "-3.21",
-              "refold_firstseq": "ACGU",
-              "refold_firststruc": "<<>>",
               "alifold_consstruc": "<<>>"
             }
             """
@@ -984,13 +966,10 @@ def test_write_summary_outputs_preserves_rscape_zero_and_na(tmp_path: Path) -> N
 
     assert "rec_zero" in log_text and "rscape 0" in log_text
     assert "rec_na" in log_text and "rscape NA" in log_text
-    assert "rec_zero,2,12,1,1,0,0.95,0.58,-14.10,-3.21" in csv_text
-    assert "rec_na,2,12,1,1,NA,0.95,0.58,-14.10,-3.21" in csv_text
-    assert "| rec_zero | 2 | 12 | 1 | 1 | 0 | 0.95 | 0.58 | -14.10 | -3.21 |" in md_text
-    assert "| rec_na | 2 | 12 | 1 | 1 | NA | 0.95 | 0.58 | -14.10 | -3.21 |" in md_text
-    assert "refold_firstseq" not in csv_text
-    assert "refold_firststruc" not in csv_text
-    assert "ACGU" not in log_text
+    assert "rec_zero,2,12,1,1,0,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
+    assert "rec_na,2,12,1,1,NA,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
+    assert "| rec_zero | 2 | 12 | 1 | 1 | 0 | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
+    assert "| rec_na | 2 | 12 | 1 | 1 | NA | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
     assert "<<>>" in log_text
 
 

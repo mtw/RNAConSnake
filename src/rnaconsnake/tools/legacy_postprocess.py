@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from rnaconsnake.tools.alifold_maxcovar import compute as compute_maxcovar
+from rnaconsnake.workflow_helpers import SUMMARY_FIELDS
 
 
 def write_json(path: str | Path, payload: dict) -> None:
@@ -66,10 +67,6 @@ def cmd_clean_clustal(args: argparse.Namespace) -> int:
 
 
 def cmd_extract_refold(args: argparse.Namespace) -> int:
-    refold_lines = Path(args.refold_output).read_text(encoding="utf-8").splitlines()
-    firstseq = refold_lines[1] if len(refold_lines) >= 2 else ""
-    firststruc = refold_lines[2] if len(refold_lines) >= 3 else ""
-
     ss_cons = ""
     for line in Path(args.rnaalifold_stk).read_text(encoding="utf-8").splitlines():
         if line.startswith("#=GC SS_cons "):
@@ -78,14 +75,7 @@ def cmd_extract_refold(args: argparse.Namespace) -> int:
                 ss_cons = parts[2]
             break
 
-    write_json(
-        args.output,
-        {
-            "refold_firstseq": firstseq,
-            "refold_firststruc": firststruc,
-            "alifold_consstruc": ss_cons,
-        },
-    )
+    write_json(args.output, {"alifold_consstruc": ss_cons})
     return 0
 
 
@@ -125,20 +115,6 @@ def cmd_combine_summary(args: argparse.Namespace) -> int:
     write_json(args.output, payload)
     return 0
 
-
-SUMMARY_FIELDS = [
-    "wbn",
-    "nrseq",
-    "alilen",
-    "maxcovarval",
-    "maxcovarcount",
-    "rscape_covary_count",
-    "rnazprob",
-    "sci",
-    "consensus_mfe",
-    "alifoldzscore",
-    "alifold_consstruc",
-]
 
 def _load_summary_records(paths: list[str]) -> list[dict[str, str]]:
     records = [json.loads(Path(path).read_text(encoding="utf-8")) for path in sorted(paths)]
