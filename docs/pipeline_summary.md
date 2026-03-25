@@ -2,11 +2,11 @@
 
 ## Overview
 
-RNAConSnake is a Snakemake-based workflow for detecting and prioritizing locally conserved RNA secondary structure candidates from multiple-sequence alignments in Stockholm format. The pipeline combines a genome-wide screen with `RNALalifold` and a per-candidate post-processing stage that computes structure, covariation, and conservation metrics for each predicted local element. The workflow is intended for comparative RNA structure analysis in viral or other compact genomes, where candidate structural elements need to be identified systematically and ranked for downstream inspection.
+RNAConSnake is a Snakemake-based workflow for detecting and prioritizing locally conserved RNA secondary structure candidates from multiple-sequence alignments in Stockholm or Clustal format. The pipeline combines a genome-wide screen with `RNALalifold` and a per-candidate post-processing stage that computes structure, covariation, and conservation metrics for each predicted local element. The workflow is intended for comparative RNA structure analysis in viral or other compact genomes, where candidate structural elements need to be identified systematically and ranked for downstream inspection.
 
 ## Input
 
-The workflow takes a multiple-sequence alignment in Stockholm format as input. For each user-specified `maxbpspan` window size, `RNALalifold` is executed on the full alignment to identify locally stable consensus structures and to emit a multi-record Stockholm output containing one candidate element per predicted local structure.
+The workflow takes a multiple-sequence alignment in Stockholm (`.stk`) or Clustal (`.aln`) format as input. For each user-specified `maxbpspan` window size, `RNALalifold` is executed on the full alignment to identify locally stable consensus structures and to emit a multi-record Stockholm output containing one candidate element per predicted local structure. RNAConSnake detects the input format from the filename suffix and calls `RNALalifold` with `-f S` for Stockholm input or `-f C` for Clustal input.
 
 ## Candidate Generation And Preprocessing
 

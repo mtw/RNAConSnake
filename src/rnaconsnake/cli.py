@@ -351,7 +351,7 @@ def main() -> int:
     if args.check_deps:
         return check_dependencies(include_rscape=args.rscape)
     if not args.input_alignment:
-        print("Missing required --input-alignment /path/to/input.stk", file=sys.stderr)
+        print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
         return 2
     dep_status = check_dependencies(include_rscape=args.rscape)
     if dep_status != 0:

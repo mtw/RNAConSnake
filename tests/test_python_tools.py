@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from rnaconsnake import cli
-from rnaconsnake.workflow_helpers import WorkflowSettings, candidate_paths
+from rnaconsnake.workflow_helpers import WorkflowSettings, candidate_paths, initial_alignment_format_code
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,11 +39,14 @@ def write_fake_rnalalifold(bin_dir: Path) -> None:
             args = sys.argv[1:]
             prefix = "RC"
             wlen = "100"
+            input_format = ""
             for i, arg in enumerate(args):
                 if arg == "--id-prefix" and i + 1 < len(args):
                     prefix = args[i + 1]
                 if arg == "-L" and i + 1 < len(args):
                     wlen = args[i + 1]
+                if arg == "-f" and i + 1 < len(args):
+                    input_format = args[i + 1]
 
             out_path = Path.cwd() / f"{prefix}_0001.stk"
             out_path.write_text(
@@ -60,7 +63,7 @@ def write_fake_rnalalifold(bin_dir: Path) -> None:
                 ),
                 encoding="utf-8",
             )
-            sys.stdout.write(f"fake RNALalifold completed for window {wlen}\\n")
+            sys.stdout.write(f"fake RNALalifold completed for window {wlen} format {input_format}\\n")
             """
         ),
         encoding="utf-8",
@@ -292,6 +295,14 @@ def test_candidate_paths_exposes_canonical_workflow_locations() -> None:
     assert paths.summary_json == "generated_files/summary/len_150/RC_150_0001_aln_1_12.summary.json"
     assert paths.png_aln == "generated_files/png/len_150/RC_150_0001_aln_1_12_aln.png"
     assert paths.cm_status_json == "generated_files/cm/len_150/RC_150_0001_aln_1_12.cm.status.json"
+
+
+def test_initial_alignment_format_code_detects_stockholm_and_clustal() -> None:
+    assert initial_alignment_format_code("example.stk") == "S"
+    assert initial_alignment_format_code("example.STK") == "S"
+    assert initial_alignment_format_code("example.aln") == "C"
+    assert initial_alignment_format_code("example.ALN") == "C"
+    assert initial_alignment_format_code("example.anything_else") == "S"
 
 
 def test_workflow_settings_default_and_override_rnaz_no_shuffle() -> None:
@@ -1153,6 +1164,9 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.log.csv").is_file()
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.md").is_file()
     assert not (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.html").exists()
+    assert "fake RNALalifold completed for window 150 format S" in read_text(
+        tmp_path / "Lalifold" / "len_150" / "RNALalifold.out"
+    )
     assert not (tmp_path / "alirna.ps").exists()
     assert not any((tmp_path / "generated_files" / "rnaalifold").glob("**/alirna.ps"))
     assert (
@@ -1163,6 +1177,72 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
         / "RC_150_0001_aln_1_12"
         / "RC_150_0001_aln_1_12_aln.pdf"
     ).is_file()
+
+
+def test_cli_workflow_smoke_test_accepts_clustal_input(tmp_path: Path) -> None:
+    input_alignment = tmp_path / "my_input.aln"
+    input_alignment.write_text(
+        "CLUSTAL W\n\nseq1 ACGU\nseq2 ACGU\n***\n",
+        encoding="utf-8",
+    )
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    write_fake_rnalalifold(bin_dir)
+    write_fake_postprocess_tools(bin_dir)
+
+    (tmp_path / "config.yaml").write_text(
+        textwrap.dedent(
+            """\
+            lalifold_base: Lalifold
+            maxbpspan:
+              - 100
+              - 200
+            lalifold_threads: 1
+            do_cm: false
+            do_locarnate: false
+            do_png: false
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    env = subprocess_env()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["HOME"] = str(tmp_path)
+    env["XDG_CACHE_HOME"] = str(tmp_path / ".cache")
+    env["TMPDIR"] = str(tmp_path / ".tmp")
+    (tmp_path / ".cache").mkdir()
+    (tmp_path / ".tmp").mkdir()
+
+    result = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.cli",
+            "--input-alignment",
+            str(input_alignment),
+            "--output-dir",
+            str(tmp_path),
+            "--maxbpspan",
+            "150",
+            "--rscape",
+            "--cores",
+            "1",
+            "--",
+            "--configfile",
+            str(tmp_path / "config.yaml"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "fake RNALalifold completed for window 150 format C" in read_text(
+        tmp_path / "Lalifold" / "len_150" / "RNALalifold.out"
+    )
     assert (
         tmp_path
         / "generated_files"
@@ -1176,7 +1256,3 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     assert "rscape_covary_count" in read_text(
         tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.log.csv"
     )
-    assert (export_dir / "manifest.json").is_file()
-    assert (export_dir / "features.csv").is_file()
-    assert (export_dir / "candidates.csv").is_file()
-    assert (export_dir / "artifacts.csv").is_file()

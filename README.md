@@ -10,7 +10,7 @@ RNAConSnake is released under the GNU Affero General Public License v3 or later 
 
 ## What Goes In
 
-- one input multiple-sequence alignment in Stockholm format
+- one input multiple-sequence alignment in Stockholm (`.stk`) or Clustal (`.aln`) format
 - one or more `maxbpspan` window sizes
 - an installed external RNA analysis toolchain available on `PATH`
 
@@ -53,7 +53,7 @@ rnaconsnake-run --check-deps
 Run the workflow:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/input.stk --output-dir /path/to/run_dir --cores all
+rnaconsnake-run --input-alignment /path/to/input_alignment.{stk,aln} --output-dir /path/to/run_dir --cores all
 ```
 
 If you want to use the repository checkout without activating the virtual environment, the repository-local launcher is:

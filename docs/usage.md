@@ -50,13 +50,13 @@ rnaconsnake-run --show-tool-paths
 ## Basic run
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/my_alignment.stk --cores all
+rnaconsnake-run --input-alignment /path/to/my_alignment.{stk,aln} --cores all
 ```
 
 To write all outputs into a dedicated working directory:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/my_alignment.stk --output-dir /path/to/run_dir --cores all
+rnaconsnake-run --input-alignment /path/to/my_alignment.{stk,aln} --output-dir /path/to/run_dir --cores all
 ```
 
 ## Common options
@@ -64,19 +64,19 @@ rnaconsnake-run --input-alignment /path/to/my_alignment.stk --output-dir /path/t
 Override the default `maxbpspan` values:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/my_alignment.stk --maxbpspan 150 --maxbpspan 250 --cores all
+rnaconsnake-run --input-alignment /path/to/my_alignment.{stk,aln} --maxbpspan 150 --maxbpspan 250 --cores all
 ```
 
 Enable optional per-hit `R-scape` analysis:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/my_alignment.stk --rscape --cores all
+rnaconsnake-run --input-alignment /path/to/my_alignment.{stk,aln} --rscape --cores all
 ```
 
 RNAz defaults to `-d -n`, which disables alignment shuffling. To explicitly allow shuffling:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/my_alignment.stk --rnaz-shuffle --cores all
+rnaconsnake-run --input-alignment /path/to/my_alignment.{stk,aln} --rnaz-shuffle --cores all
 ```
 
 If you want Snakemake to reuse existing outputs more conservatively and avoid reruns caused only by workflow code changes:

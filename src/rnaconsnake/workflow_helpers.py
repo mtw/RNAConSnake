@@ -274,8 +274,23 @@ def split_file_basenames_from_manifest(path: str | Path) -> list[str]:
 
 def initial_alignment_input(input_alignment: str | None) -> list[str]:
     if not input_alignment:
-        raise ValueError("Missing required config value 'input_alignment'. Use rnaconsnake-run --input-alignment /path/to/input.stk")
+        raise ValueError(
+            "Missing required config value 'input_alignment'. "
+            "Use rnaconsnake-run --input-alignment /path/to/input_alignment.{stk,aln}"
+        )
     return [str(input_alignment)]
+
+
+def initial_alignment_format_code(input_alignment: str | None) -> str:
+    if not input_alignment:
+        raise ValueError(
+            "Missing required config value 'input_alignment'. "
+            "Use rnaconsnake-run --input-alignment /path/to/input_alignment.{stk,aln}"
+        )
+    suffix = Path(input_alignment).suffix.lower()
+    if suffix == ".aln":
+        return "C"
+    return "S"
 
 
 def candidate_outputs_for_manifest(

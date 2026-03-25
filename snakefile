@@ -7,6 +7,7 @@ from rnaconsnake.workflow_helpers import (
     WorkflowSettings,
     candidate_paths,
     candidate_outputs_for_manifest,
+    initial_alignment_format_code,
     initial_alignment_input as required_initial_alignment_input,
     normalize_rnaalifold_side_output,
     read_json,
@@ -23,6 +24,7 @@ configfile: "config.yaml"
 
 SETTINGS = WorkflowSettings.from_config(config)
 INPUT_ALIGNMENT = SETTINGS.input_alignment
+INPUT_ALIGNMENT_FORMAT = initial_alignment_format_code(INPUT_ALIGNMENT)
 MAXBPSPAN = SETTINGS.maxbpspan
 LALIFOLD_THREADS = SETTINGS.lalifold_threads
 REMOVE_GAPONLY_GAPRATIO = SETTINGS.remove_gaponly_gapratio
@@ -141,7 +143,8 @@ rule RNALalifold:
         multistk="Lalifold/len_{wlen}/RC_{wlen}_0001.stk"
     params:
         cmd=SETTINGS.tools.get("rnalalifold", "RNALalifold"),
-        input_abs=lambda wildcards, input: os.path.abspath(input[0])
+        input_abs=lambda wildcards, input: os.path.abspath(input[0]),
+        input_format=lambda wildcards: INPUT_ALIGNMENT_FORMAT
     threads:
         LALIFOLD_THREADS
     shell:
@@ -155,7 +158,7 @@ rule RNALalifold:
             --cfactor 0.6 --nfactor 0.5 \
             -r \
             --csv \
-            -f S \
+            -f {params.input_format} \
             < {params.input_abs} > RNALalifold.out 2> RNALalifold.err
         """
 
