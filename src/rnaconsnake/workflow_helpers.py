@@ -212,10 +212,6 @@ class CandidatePaths:
         return f"generated_files/cm/{self.len_dir}/{self.file}.cm.status.json"
 
 
-def candidate_paths(wlen: str | int, file: str) -> CandidatePaths:
-    return CandidatePaths(wlen=wlen, file=file)
-
-
 def read_manifest(path: str | Path) -> list[str]:
     with open(path, encoding="utf-8") as handle:
         return [line.strip() for line in handle if line.strip()]
@@ -275,6 +271,9 @@ def normalize_rnaalifold_side_output(outdir: Path, canonical_path: str | Path, s
             f"Multiple RNAalifold outputs matched {canonical.name}: "
             + ", ".join(candidate.name for candidate in candidates)
         )
+    raise FileNotFoundError(
+        f"Expected RNAalifold output not found and no renamed variant matched: {canonical.name}"
+    )
 
 
 def split_file_basenames_from_manifest(path: str | Path) -> list[str]:
@@ -309,7 +308,7 @@ def candidate_outputs_for_manifest(
 ) -> list[str]:
     outputs: list[str] = []
     for file in split_file_basenames_from_manifest(manifest_path):
-        value = path_getter(candidate_paths(wlen, file))
+        value = path_getter(CandidatePaths(wlen=wlen, file=file))
         if isinstance(value, list):
             outputs.extend(value)
         else:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rnaconsnake.workflow_helpers import (
     WorkflowSettings,
-    candidate_paths,
+    CandidatePaths,
     candidate_outputs_for_manifest,
     initial_alignment_format_code,
     initial_alignment_input as required_initial_alignment_input,
@@ -43,6 +43,11 @@ wildcard_constraints:
 
 def command_tokens(name, default):
     return SETTINGS.command_tokens(name, default)
+
+
+def write_output_manifest(output_path, input_paths):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    write_manifest(output_path, [os.path.basename(p) for p in input_paths])
 
 
 def split_file_basenames(wildcards):
@@ -194,7 +199,7 @@ rule preprocess_alignment_file:
     threads:
         1
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         Path(output.orig).parent.mkdir(parents=True, exist_ok=True)
         Path(output.remgap).parent.mkdir(parents=True, exist_ok=True)
         Path(output.strip).parent.mkdir(parents=True, exist_ok=True)
@@ -216,43 +221,27 @@ rule preprocess_alignment_file:
 
 
 rule orig_manifest:
-    input:
-        orig_outputs
-    output:
-        "generated_files/orig/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: orig_outputs
+    output: "generated_files/orig/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule remgap_manifest:
-    input:
-        remgap_outputs
-    output:
-        "generated_files/remgap/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: remgap_outputs
+    output: "generated_files/remgap/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule strip_manifest:
-    input:
-        strip_outputs
-    output:
-        "generated_files/strip/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: strip_outputs
+    output: "generated_files/strip/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule stk_manifest:
-    input:
-        stk_outputs
-    output:
-        "generated_files/stk/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: stk_outputs
+    output: "generated_files/stk/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule analyze_alignment_file:
@@ -265,7 +254,7 @@ rule analyze_alignment_file:
         alifoldz_txt="generated_files/alifoldz/len_{wlen}/{file}.alifoldz.txt",
         alifoldz_metrics="generated_files/alifoldz/len_{wlen}/{file}.alifoldz.json"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         Path(paths.aln).parent.mkdir(parents=True, exist_ok=True)
         Path(paths.rnaz_txt).parent.mkdir(parents=True, exist_ok=True)
         Path(paths.alifoldz_txt).parent.mkdir(parents=True, exist_ok=True)
@@ -331,7 +320,7 @@ rule run_post_rnaalifold_file:
         ss_eps="generated_files/rnaalifold/len_{wlen}/{file}/{file}_ss.eps",
         ss_pdf="generated_files/rnaalifold/len_{wlen}/{file}/{file}_ss.pdf"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         outdir = Path(paths.rnaalifold_dir)
         outdir.mkdir(parents=True, exist_ok=True)
         run_checked(
@@ -396,20 +385,16 @@ rule render_pngs_file:
         aln_png="generated_files/png/len_{wlen}/{file}_aln.png",
         ss_png="generated_files/png/len_{wlen}/{file}_ss.png"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         os.makedirs(os.path.dirname(paths.png_aln), exist_ok=True)
         run_checked(command_tokens("magick", "magick") + [input.aln_ps, paths.png_aln])
         run_checked(command_tokens("magick", "magick") + [input.ss_ps, paths.png_ss])
 
 
 rule png_manifest:
-    input:
-        png_outputs if DO_PNG else lambda wildcards: []
-    output:
-        "generated_files/png/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: png_outputs if DO_PNG else lambda wildcards: []
+    output: "generated_files/png/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule reformat_rnaalifold_results_file:
@@ -495,7 +480,7 @@ rule run_maxcovar_file:
         log="generated_files/maxcovar/len_{wlen}/{file}_alifoldmaxcovar.log",
         metrics="generated_files/maxcovar/len_{wlen}/{file}.maxcovar.json"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         os.makedirs(os.path.dirname(paths.maxcovar_log), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
@@ -518,7 +503,7 @@ rule run_rscape_file:
         power="generated_files/rscape/len_{wlen}/{file}.power",
         metrics="generated_files/rscape/len_{wlen}/{file}.rscape.json"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         os.makedirs(os.path.dirname(paths.rscape_power), exist_ok=True)
         if not DO_RSCAPE:
             Path(paths.rscape_power).write_text("# R-scape disabled\n", encoding="utf-8")
@@ -580,13 +565,9 @@ rule run_rscape_file:
 
 
 rule rscape_manifest:
-    input:
-        rscape_outputs
-    output:
-        "generated_files/rscape/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: rscape_outputs
+    output: "generated_files/rscape/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule build_cm_file:
@@ -597,7 +578,7 @@ rule build_cm_file:
     output:
         "generated_files/cm/len_{wlen}/{file}.cm.status.json"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         outdir = Path(paths.cm_status_json).parent
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -641,13 +622,9 @@ rule build_cm_file:
 
 
 rule cm_manifest:
-    input:
-        cm_status_outputs
-    output:
-        "generated_files/cm/len_{wlen}/manifest.txt"
-    run:
-        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        write_manifest(output[0], [os.path.basename(path) for path in input])
+    input: cm_status_outputs
+    output: "generated_files/cm/len_{wlen}/manifest.txt"
+    run: write_output_manifest(output[0], input)
 
 
 rule combine_summary_metrics_file:
@@ -660,7 +637,7 @@ rule combine_summary_metrics_file:
     output:
         "generated_files/summary/len_{wlen}/{file}.summary.json"
     run:
-        paths = candidate_paths(wildcards.wlen, wildcards.file)
+        paths = CandidatePaths(wlen=wildcards.wlen, file=wildcards.file)
         os.makedirs(os.path.dirname(paths.summary_json), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")

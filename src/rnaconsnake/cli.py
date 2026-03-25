@@ -284,7 +284,8 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
     bars: dict[str, tqdm] = {}
     current_stats: list[str] | None = None
     try:
-        assert process.stdout is not None
+        if process.stdout is None:
+            raise RuntimeError("subprocess stdout pipe was not established")
         for raw_line in process.stdout:
             line = raw_line.rstrip("\n")
 

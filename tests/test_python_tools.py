@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from rnaconsnake import cli
-from rnaconsnake.workflow_helpers import WorkflowSettings, candidate_paths, initial_alignment_format_code
+from rnaconsnake.workflow_helpers import WorkflowSettings, CandidatePaths, initial_alignment_format_code
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -276,7 +276,7 @@ def test_parse_job_stats_lines_extracts_totals_and_rule_counts() -> None:
 
 
 def test_candidate_paths_exposes_canonical_workflow_locations() -> None:
-    paths = candidate_paths(150, "RC_150_0001_aln_1_12")
+    paths = CandidatePaths(wlen=150, file="RC_150_0001_aln_1_12")
 
     assert paths.split == "Lalifold/len_150/split/RC_150_0001_aln_1_12.stk"
     assert paths.remgap == "generated_files/remgap/len_150/RC_150_0001_aln_1_12_remgap.stk"
@@ -313,7 +313,7 @@ def test_workflow_settings_default_and_override_rnaz_no_shuffle() -> None:
 def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     candidate_id = "RC_150_0001_aln_1_12"
-    paths = candidate_paths(150, candidate_id)
+    paths = CandidatePaths(wlen=150, file=candidate_id)
 
     summary_dir = run_dir / "generated_files" / "summary" / "len_150"
     summary_dir.mkdir(parents=True)

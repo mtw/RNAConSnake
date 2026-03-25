@@ -11,6 +11,11 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   `legacy_postprocess` and `export_bundle`, eliminating a previously diverged duplicate
 - `refold_firstseq` and `refold_firststruc` fields removed from summary outputs and export bundles
 - `run_checked` now uses `contextlib.ExitStack` for guaranteed file handle cleanup
+- `normalize_rnaalifold_side_output` now raises `FileNotFoundError` on zero matches
+  instead of silently no-oping
+- `candidate_paths()` wrapper removed; call sites use `CandidatePaths(...)` directly
+- Manifest rules in the snakefile now delegate to a shared `write_output_manifest` helper,
+  eliminating repeated boilerplate across all seven manifest rules
 
 ## [0.2.0] - 2026-03-24
 

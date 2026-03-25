@@ -88,16 +88,13 @@ def cmd_run_maxcovar(args: argparse.Namespace) -> int:
     nrseq = first_ali[0] if len(first_ali) >= 1 else ""
     alilen = first_ali[5] if len(first_ali) >= 6 else ""
 
-    first_log = [str(maxcovar), what]
-    maxcovarcount = first_log[1] if len(first_log) >= 2 else ""
-
     write_json(
         args.output,
         {
             "maxcovarval": str(maxcovar),
             "nrseq": nrseq,
             "alilen": alilen,
-            "maxcovarcount": maxcovarcount,
+            "maxcovarcount": what,
         },
     )
     return 0
