@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 import textwrap
-import json
 from pathlib import Path
+
+import pytest
 
 from rnaconsnake import cli
 from rnaconsnake.workflow_helpers import WorkflowSettings, CandidatePaths, initial_alignment_format_code
@@ -303,6 +305,17 @@ def test_initial_alignment_format_code_detects_stockholm_and_clustal() -> None:
     assert initial_alignment_format_code("example.aln") == "C"
     assert initial_alignment_format_code("example.ALN") == "C"
     assert initial_alignment_format_code("example.anything_else") == "S"
+
+
+def test_initial_alignment_format_code_handles_suffixless_input() -> None:
+    assert initial_alignment_format_code("example") == "S"
+    assert initial_alignment_format_code("example.") == "S"
+
+
+def test_initial_alignment_format_code_missing_input() -> None:
+    with pytest.raises(ValueError) as exc:
+        initial_alignment_format_code(None)
+    assert "input_alignment.{stk,aln}" in str(exc.value)
 
 
 def test_workflow_settings_default_and_override_rnaz_no_shuffle() -> None:
@@ -1235,3 +1248,17 @@ def test_cli_workflow_smoke_test_accepts_clustal_input(tmp_path: Path) -> None:
     assert "rscape_covary_count" in read_text(
         tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.log.csv"
     )
+
+
+def test_docs_reference_supported_input_formats() -> None:
+    for doc in [
+        Path("README.md"),
+        Path("docs/usage.md"),
+        Path("docs/pipeline_summary.md"),
+    ]:
+        text = read_text(doc)
+        assert ".stk" in text
+        if doc.name == "usage.md":
+            assert "{stk,aln}" in text
+        else:
+            assert ".aln" in text

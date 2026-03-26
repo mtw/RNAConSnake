@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 
 ## [Unreleased]
 
+### Added
+- Input format detection for the initial `RNALalifold` run: `.stk` uses `-f S`, `.aln` uses `-f C`
+- Smoke test coverage for Clustal input alongside the existing Stockholm workflow smoke test
+- Regression check that public docs mention both `.stk` and `.aln` inputs
+- Additional unit coverage for `initial_alignment_format_code` edge cases (uppercase, suffixless, missing input)
+
 ### Changed
 - `SUMMARY_FIELDS` is now defined once in `workflow_helpers` and imported by both
   `legacy_postprocess` and `export_bundle`, eliminating a previously diverged duplicate
