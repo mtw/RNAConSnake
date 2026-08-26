@@ -38,7 +38,10 @@ VERSION_PROBES: list[tuple[str, str, list[str]]] = [
 ]
 
 
-VERSION_PATTERN = re.compile(r"\d+\.\d+")
+VERSION_PATTERN = re.compile(r"\d+\.\d+(?:\.\d+)*")
+
+# The ViennaRNA binaries, which must be the same build as the Python module.
+VIENNARNA_BINARY_KEYS = ("rnalalifold", "rnaalifold")
 
 
 def _first_informative_line(text: str) -> str:
@@ -112,17 +115,41 @@ def viennarna_bindings() -> dict[str, str]:
     }
 
 
+def viennarna_consistency(bindings: dict[str, str], external: dict[str, dict[str, str]]) -> str:
+    """``yes``/``no``/``unknown``: do the module and the binaries match?
+
+    Recorded rather than enforced here -- ``RNAcs --check-deps`` refuses to run
+    a mixed toolchain -- so that a finished run's provenance answers the
+    question on its own.
+    """
+    wanted = _version_number(bindings.get("version", ""))
+    if not wanted:
+        return "unknown"
+    found = [_version_number(external.get(key, {}).get("version", "")) for key in VIENNARNA_BINARY_KEYS]
+    seen = [version for version in found if version]
+    if not seen:
+        return "unknown"
+    return "yes" if all(version == wanted for version in seen) else "no"
+
+
+def _version_number(text: str) -> str:
+    match = VERSION_PATTERN.search(text or "")
+    return match.group(0) if match else ""
+
+
 def collect(tools: dict[str, str] | None = None) -> dict[str, object]:
     configured = dict(tools or {})
     external: dict[str, dict[str, str]] = {}
     for key, default, version_args in VERSION_PROBES:
         external[key] = probe(configured.get(key, default), version_args)
+    bindings = viennarna_bindings()
+    bindings["matches_binaries"] = viennarna_consistency(bindings, external)
     return {
         "rnaconsnake": python_package_version("rnaconsnake"),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "snakemake": python_package_version("snakemake"),
-        "viennarna_bindings": viennarna_bindings(),
+        "viennarna_bindings": bindings,
         "external_tools": external,
     }
 

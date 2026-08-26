@@ -40,6 +40,11 @@ def write_fake_rnalalifold(bin_dir: Path) -> None:
             from pathlib import Path
 
             args = sys.argv[1:]
+            if "--version" in args:
+                import RNA
+
+                print("RNALalifold " + RNA.__version__)
+                raise SystemExit(0)
             prefix = "RC"
             wlen = "100"
             input_format = ""
@@ -120,7 +125,9 @@ from pathlib import Path
 args = sys.argv[1:]
 if "--version" in args:
     # The real binary prints and exits; it does not fold, and must not write.
-    print("RNAalifold 2.7.2")
+    # The version is the module's: RNAcs requires one ViennaRNA build.
+    import RNA
+    print("RNAalifold " + RNA.__version__)
     raise SystemExit(0)
 prefix = "fake"
 for i, arg in enumerate(args):
@@ -2080,6 +2087,7 @@ def test_versions_report_records_python_and_external_tools(tmp_path: Path) -> No
     # part of the toolchain a calibrated run has to be reproducible against.
     assert "viennarna_bindings:" in text
     assert payload["viennarna_bindings"]["module"] == "RNA"
+    assert payload["viennarna_bindings"]["matches_binaries"] in {"yes", "no", "unknown"}
 
 
 def test_the_refold_leg_no_longer_needs_perl_or_rnafold() -> None:
@@ -2110,15 +2118,67 @@ def test_check_deps_requires_the_viennarna_python_module(monkeypatch) -> None:
     assert cli.check_dependencies() == 2
 
 
-def test_check_deps_warns_when_bindings_and_binaries_disagree(capsys) -> None:
-    """The consensus comes from the RNAalifold binary and the refold from the
-    module: two builds in one run means two sets of energy parameters."""
-    cli.warn_on_viennarna_mismatch("9.9.9", {"rnaalifold": "RNAalifold"})
+def _fake_viennarna_tools(tmp_path: Path, version: str) -> dict[str, str]:
+    """Stand-ins for every ViennaRNA binary the check looks at, so the machine's
+    own install does not decide the outcome."""
+    tools = {}
+    for key in cli.VIENNARNA_BINARIES:
+        script = tmp_path / key
+        script.write_text(f"#!/usr/bin/env python3\nprint('{key} {version}')\n", encoding="utf-8")
+        script.chmod(0o755)
+        tools[key] = str(script)
+    return tools
+
+
+def test_viennarna_binaries_must_be_the_same_build_as_the_module(tmp_path: Path) -> None:
+    """The consensus structure comes from the binaries and the refold from the
+    Python module. Two builds in one run means two sets of energy parameters,
+    so the versions must be identical -- not merely close."""
+    tools = _fake_viennarna_tools(tmp_path, "2.6.4")
+
+    conflicts = cli.viennarna_version_conflicts("2.7.2", tools)
+    assert len(conflicts) == len(cli.VIENNARNA_BINARIES), conflicts
+    assert any("2.6.4" in line and "2.7.2" in line for line in conflicts)
+    assert cli.viennarna_version_conflicts("2.6.4", tools) == []
+
+    # Exact equality: a prefix match is not a match.
+    assert cli.viennarna_version_conflicts("2.6.40", tools)
+
+    # Nothing to compare against is not a conflict.
+    assert cli.viennarna_version_conflicts(None, tools) == []
+    missing = dict.fromkeys(cli.VIENNARNA_BINARIES, "definitely-not-installed")
+    assert cli.viennarna_version_conflicts("2.6.4", missing) == []
+
+
+def test_check_deps_fails_on_a_viennarna_version_mismatch(monkeypatch, capsys) -> None:
+    """A mixed toolchain is a refusal, not a warning: a calibrated result could
+    not be reproduced from the versions the run records."""
+    monkeypatch.setattr(cli, "viennarna_bindings_version", lambda: "2.7.2")
+    monkeypatch.setattr(
+        cli,
+        "viennarna_version_conflicts",
+        lambda bindings, tools=None: ["RNAalifold is 2.6.4, the RNA Python module is 2.7.2"],
+    )
+    assert cli.check_dependencies() == 2
     captured = capsys.readouterr()
-    if not captured.err:
-        pytest.skip("RNAalifold is not installed, so there is nothing to compare against")
-    assert "9.9.9" in captured.err
-    assert "energy parameters" in captured.err
+    assert "ViennaRNA version mismatch" in captured.err
+    assert "same ViennaRNA release" in captured.err
+
+
+def test_versions_report_states_whether_the_toolchain_is_one_build(tmp_path: Path) -> None:
+    """The finished run's provenance answers the question on its own."""
+    from rnaconsnake.tools.versions import viennarna_consistency
+
+    bindings = {"version": "2.7.2"}
+    matching = {
+        "rnalalifold": {"version": "RNALalifold 2.7.2"},
+        "rnaalifold": {"version": "RNAalifold 2.7.2"},
+    }
+    mixed = {"rnalalifold": {"version": "RNALalifold 2.7.2"}, "rnaalifold": {"version": "RNAalifold 2.6.4"}}
+    assert viennarna_consistency(bindings, matching) == "yes"
+    assert viennarna_consistency(bindings, mixed) == "no"
+    assert viennarna_consistency({"version": "unknown"}, matching) == "unknown"
+    assert viennarna_consistency(bindings, {"rnalalifold": {"version": "unknown"}}) == "unknown"
 
 
 def test_version_probes_do_not_write_into_the_working_directory(tmp_path: Path) -> None:

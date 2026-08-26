@@ -227,6 +227,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+# ViennaRNA binaries: every one of these comes from the same install as the
+# Python module, and must report the same version as it.
+VIENNARNA_BINARIES = ("rnalalifold", "rnaalifold")
+
+VERSION_NUMBER = re.compile(r"\d+\.\d+(?:\.\d+)*")
+
+
 NULL_METHOD_TOOLS = {
     "sissiz": "sissiz",
     "rnazRandomizeAln": "rnaz_randomize_aln",
@@ -290,34 +297,57 @@ def check_dependencies(
         if not executable or shutil.which(executable) is None:
             missing.append(command if command == executable else f"{executable} (from {name}: {command})")
 
-    if missing:
-        print("Missing runtime dependencies:", file=sys.stderr)
-        for dep in missing:
-            print(f"  - {dep}", file=sys.stderr)
+    conflicts = viennarna_version_conflicts(bindings, configured_tools)
+
+    if missing or conflicts:
+        if missing:
+            print("Missing runtime dependencies:", file=sys.stderr)
+            for dep in missing:
+                print(f"  - {dep}", file=sys.stderr)
+        if conflicts:
+            print("ViennaRNA version mismatch:", file=sys.stderr)
+            for conflict in conflicts:
+                print(f"  - {conflict}", file=sys.stderr)
+            print(
+                "  The consensus structure comes from the binaries and the refold from "
+                "the module.\n"
+                "  Install both from the same ViennaRNA release; one run must not mix "
+                "two builds'\n  energy parameters.",
+                file=sys.stderr,
+            )
         return 2
 
-    warn_on_viennarna_mismatch(bindings, configured_tools)
-    print("All external runtime dependencies are available.")
+    print(f"All external runtime dependencies are available (ViennaRNA {parse_version(bindings)}).")
     return 0
 
 
-def warn_on_viennarna_mismatch(bindings: str | None, configured_tools: dict[str, str] | None = None) -> None:
-    """Say so when the bindings and the binaries are different ViennaRNA builds.
+def viennarna_version_conflicts(
+    bindings: str | None, configured_tools: dict[str, str] | None = None
+) -> list[str]:
+    """ViennaRNA binaries whose version differs from the Python module's.
 
-    The consensus structure comes from the ``RNAalifold`` binary and the refold
-    from the Python module. Different builds mean different energy parameters
-    in one run, which is exactly the kind of thing a recorded calibration
-    cannot be reproduced through.
+    The consensus structure comes from the binaries and the refold from the
+    module. Two ViennaRNA builds in one run means two sets of energy
+    parameters, so a calibrated result could not be reproduced from the
+    toolchain it records. The versions have to be identical, not merely close.
     """
-    if not bindings:
-        return
-    binary = probe_version(tool_command("rnaalifold", configured_tools))
-    if binary and bindings not in binary:
-        print(
-            f"Warning: ViennaRNA Python module {bindings} alongside {binary.strip()}. "
-            "One run would mix two builds' energy parameters.",
-            file=sys.stderr,
-        )
+    wanted = parse_version(bindings)
+    if not wanted:
+        return []
+    conflicts = []
+    for name in VIENNARNA_BINARIES:
+        command = tool_command(name, configured_tools)
+        reported = probe_version(command)
+        found = parse_version(reported)
+        if found and found != wanted:
+            conflicts.append(f"{command} is {found}, the RNA Python module is {wanted}")
+    return conflicts
+
+
+def parse_version(text: str | None) -> str:
+    """The first dotted version number in ``text`` (``RNAalifold 2.7.2`` -> ``2.7.2``)."""
+    match = VERSION_NUMBER.search(text or "")
+    return match.group(0) if match else ""
 
 
 def probe_version(command: str) -> str:
