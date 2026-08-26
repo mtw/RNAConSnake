@@ -146,11 +146,14 @@ def discover_summary_records(run_dir: Path) -> list[SummaryRecord]:
 
 
 def sort_summary_records(records: list[SummaryRecord]) -> list[SummaryRecord]:
+    """Same order as the run's own reports: strongest covariation first, then
+    strongest AlifoldZ -- negated, because a more negative z-score is the more
+    significant one. Missing values rank last."""
     return sorted(
         records,
         key=lambda record: (
             parse_float(record.values.get("maxcovarval", "")),
-            parse_float(record.values.get("alifoldzscore", "")),
+            -parse_float(record.values.get("alifoldzscore", ""), default=float("inf")),
         ),
         reverse=True,
     )

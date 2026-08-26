@@ -198,8 +198,9 @@ The calibration arm counts the loci produced by this same procedure rather than
 raw windows, so q-values describe the candidates the ranked table reports.
 Overlapping windows are not independent, and counting them as if they were
 would inflate both arms. `results/calibration/summary.json` records the method
-used under `dereplication_method`, and reports the window-to-locus collapse
-ratio per arm — if the arms de-replicate differently, the null count is
+used under `dereplication_method` -- and, under `thresholds`, every clustering
+parameter that changes the locus count -- and reports the window-to-locus
+collapse ratio per arm — if the arms de-replicate differently, the null count is
 distorted and a warning is emitted.
 
 ## Configuration

@@ -528,6 +528,12 @@ def calibrate(
             "locus_min_overlap": thresholds.locus_min_overlap,
             "dereplicate_method": thresholds.dereplicate_method,
             "pair_containment": thresholds.pair_containment,
+            # Clustering parameters change how many loci each arm reports, so
+            # they change the q-values; a recorded calibration is only
+            # reproducible with all of them.
+            "max_container_width": thresholds.max_container_width,
+            "container_min_coverage": thresholds.container_min_coverage,
+            "representative_rule": thresholds.representative_rule,
             "collapse_ratio_tolerance": thresholds.collapse_ratio_tolerance,
         },
         "counting_unit": "merged_loci",

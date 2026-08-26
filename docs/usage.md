@@ -41,6 +41,16 @@ Check the dependency set including optional `R-scape` support:
 RNAcs --check-deps --rscape
 ```
 
+The check follows the run's own configuration: a tool redirected through
+`tools:` is checked at the command configured there, and the branches a run
+will actually take — `do_rscape`, `null.method`, whether set by flag, by
+`--config`, or in the config file — bring in their own dependencies. Pass the
+same `--configfile` you will run with to check that run:
+
+```bash
+RNAcs --check-deps -- --configfile /path/to/config.yaml
+```
+
 To inspect which external tool commands RNAConSnake is configured to use, and where their executables resolve on the current machine:
 
 ```bash
@@ -197,7 +207,7 @@ Options:
 | `--null-replicates N` | Replicate count. 10 gives an order-of-magnitude sanity check; 100 gives usable q-values with resolution floored at 1/100. |
 | `--null-seed N` | Base seed. Per-arm seeds are derived deterministically from it. |
 | `--no-two-stage` | Run AlifoldZ on every candidate instead of only on stage-one survivors. Much slower, but the FDR is then unconditional. |
-| `--benchmark` | Also build the positive-control recovery table. |
+| `--benchmark` | Also build the positive-control recovery table, with the null arms as its baseline. Requires the arm. |
 | `--emit-versions` | Write `results/versions.yaml` even without the calibration arm. |
 
 ### What changes when the arm is on
@@ -216,8 +226,10 @@ Outputs:
 - `results/calibration/qvalues.tsv` - one row per real **locus** with its
   scores and q-values.
 - `results/calibration/score_dists.tsv` - the null score distributions.
-- `results/calibration/summary.json` - method, replicates, seed, thresholds,
-  collapse ratios, warnings, and the composite cascade FDR.
+- `results/calibration/summary.json` - method, replicates, seed, thresholds
+  (including the clustering parameters that decide how many loci each arm
+  reports, and therefore the q-values), collapse ratios, warnings, and the
+  composite cascade FDR.
 
 ### Statistics
 
@@ -349,21 +361,31 @@ This scores `results/calibration/qvalues.tsv` against the curated truth file at
 `results/benchmark/flavivirus_recovery.tsv`: one row per known element, whether
 it was recovered, and at what q-value.
 
+`--benchmark` requires the null arm, because the table it scores is the
+calibrated one. Without `--null-arm` (or `null.method` in the config file) the
+run stops before starting and says so.
+
 ### Recovery needs a null baseline
 
 Reported loci typically cover most of an alignment, so an overlap test can be
-satisfied by chance. Pass the null arms' locus tables and the report states how
-many elements they also "recover":
+satisfied by chance. The workflow therefore passes every null arm's locus
+tables to the benchmark, and the report states how many elements those arms
+also "recover". Run by hand, it looks like this:
 
 ```bash
 python -m rnaconsnake.tools.benchmark \
   --truth resources/benchmark/<truth>.tsv \
   --qvalues run_dir/results/calibration/qvalues.tsv \
-  --null-loci run_dir/arms/null_000/generated_files/summary/len_100/RNAConSnake.nr.csv \
+  --null-loci run_dir/arms/null_000/generated_files/summary/len_{100,200}/RNAConSnake.nr.csv \
   ... one --null-loci per arm ... \
   --min-overlap-fraction 1.0 \
   --output recovery.tsv
 ```
+
+One `--null-loci` per arm, listing all of that arm's window lengths after it:
+the tables under a single `--null-loci` pool into one baseline sample. Giving
+each window length its own `--null-loci` would count it as a separate
+replicate, and understate the baseline.
 
 On a JEV-group screen this matters a great deal. At the default
 `--min-overlap-fraction 0.5` the real arm recovers 9/9 and the *null* arms

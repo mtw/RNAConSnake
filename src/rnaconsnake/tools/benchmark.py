@@ -330,11 +330,16 @@ def main() -> int:
     parser.add_argument(
         "--null-loci",
         action="append",
+        nargs="+",
         default=[],
+        metavar="TABLE",
         help=(
-            "A null arm's locus table (RNAConSnake.nr.csv). Repeatable. Adds a baseline "
-            "showing how many elements a null arm also 'recovers', without which a "
-            "recovery count is uninterpretable."
+            "One null arm's locus tables (RNAConSnake.nr.csv), one per window length. "
+            "Repeat the option once per arm. Adds a baseline showing how many elements "
+            "a null arm also 'recovers', without which a recovery count is "
+            "uninterpretable. Tables listed under a single --null-loci are pooled into "
+            "one arm; splitting an arm's window lengths across several --null-loci "
+            "would count each as its own arm and understate the baseline."
         ),
     )
     parser.add_argument(
@@ -348,7 +353,9 @@ def main() -> int:
     loci = read_qvalues(args.qvalues)
     results = evaluate(truth, loci, args.min_overlap_fraction, args.allow_uncurated)
 
-    null_loci = [_read_locus_table(path) for path in args.null_loci]
+    null_loci = [
+        [row for path in group for row in _read_locus_table(path)] for group in args.null_loci
+    ]
     baseline = null_baseline(truth, null_loci, args.min_overlap_fraction) if null_loci else None
     write_recovery(results, args.output, baseline)
 

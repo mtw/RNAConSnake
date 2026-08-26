@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import shlex
@@ -15,25 +16,63 @@ import yaml
 
 from rnaconsnake import __version__
 from rnaconsnake.export_bundle import build_export
+from rnaconsnake.workflow_helpers import NullSettings
 
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover - fallback only
     tqdm = None
 
-DEFAULT_RUNTIME_DEPENDENCIES = [
-    "RNALalifold",
-    "snakemake",
-    "esl-reformat",
-    "RNAz",
-    "alifoldz.pl",
-    "RNAalifold",
+# Every external command the workflow can invoke, and the command used when
+# ``tools:`` in the config file does not override it. The preflight check and
+# ``--show-tool-paths`` both resolve through this table, so a configured
+# ``tools.alifoldz: /custom/path/alifoldz.pl`` is what actually gets checked.
+DEFAULT_TOOL_COMMANDS = {
+    "rnalalifold": "RNALalifold",
+    "remove_gaponly": "python3 -m rnaconsnake.tools.remove_gaponly",
+    "strip_aln": "python3 -m rnaconsnake.tools.strip_aln",
+    "legacy_postprocess": "python3 -m rnaconsnake.tools.legacy_postprocess",
+    "eslreformat": "esl-reformat",
+    "rnaz": "RNAz",
+    "alifoldz": "alifoldz.pl",
+    "rnaalifold": "RNAalifold",
+    "ps2eps": "ps2eps",
+    "epstopdf": "epstopdf",
+    "refold": "refold.pl",
+    "rnafold": "RNAfold",
+    "magick": "magick",
+    "cmbuild": "cmbuild",
+    "cmcalibrate": "cmcalibrate",
+    "rscape": "R-scape",
+    "sissiz": "SISSIz",
+    "rnaz_randomize_aln": "rnazRandomizeAln.pl",
+    "null_model": "python3 -m rnaconsnake.tools.null_model",
+    "calibration": "python3 -m rnaconsnake.tools.calibration",
+    "benchmark": "python3 -m rnaconsnake.tools.benchmark",
+    "dereplicate": "python3 -m rnaconsnake.tools.dereplicate",
+    "versions": "python3 -m rnaconsnake.tools.versions",
+    "alignment_report": "python3 -m rnaconsnake.tools.alignment_report",
+    "benchmark_scaffold": "python3 -m rnaconsnake.tools.benchmark_scaffold",
+    "threshold_sweep": "python3 -m rnaconsnake.tools.threshold_sweep",
+    "alifoldmaxcovar": "python3 -m rnaconsnake.tools.alifold_maxcovar",
+}
+
+# Tool keys every run needs, regardless of which optional branches are on.
+DEFAULT_RUNTIME_TOOLS = [
+    "rnalalifold",
+    "eslreformat",
+    "rnaz",
+    "alifoldz",
+    "rnaalifold",
     "ps2eps",
     "epstopdf",
-    "refold.pl",
-    "RNAfold",
+    "refold",
+    "rnafold",
     "magick",
 ]
+
+# Not a configurable tool: RNAcs invokes it directly.
+DEFAULT_RUNTIME_DEPENDENCIES = ["snakemake"]
 
 
 PROGRAM_NAME = "RNAcs"
@@ -185,22 +224,56 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+NULL_METHOD_TOOLS = {
+    "sissiz": "sissiz",
+    "rnazRandomizeAln": "rnaz_randomize_aln",
+}
+
+# The default executable behind each null-model backend, for messages that name
+# the program rather than the tool key.
 NULL_METHOD_DEPENDENCIES = {
-    "sissiz": "SISSIz",
-    "rnazRandomizeAln": "rnazRandomizeAln.pl",
+    method: DEFAULT_TOOL_COMMANDS[name] for method, name in NULL_METHOD_TOOLS.items()
 }
 
 
-def check_dependencies(include_rscape: bool = False, null_method: str | None = None) -> int:
-    dependencies = list(DEFAULT_RUNTIME_DEPENDENCIES)
+def tool_command(name: str, configured_tools: dict[str, str] | None = None) -> str:
+    """The command configured for a tool, falling back to its default."""
+    configured = (configured_tools or {}).get(name)
+    return str(configured) if configured else DEFAULT_TOOL_COMMANDS[name]
+
+
+def required_tool_names(include_rscape: bool = False, null_method: str | None = None) -> list[str]:
+    tools = list(DEFAULT_RUNTIME_TOOLS)
     if include_rscape:
-        dependencies.append("R-scape")
-    if null_method in NULL_METHOD_DEPENDENCIES:
-        dependencies.append(NULL_METHOD_DEPENDENCIES[null_method])
+        tools.append("rscape")
+    if null_method in NULL_METHOD_TOOLS:
+        tools.append(NULL_METHOD_TOOLS[null_method])
+    return tools
+
+
+def check_dependencies(
+    include_rscape: bool = False,
+    null_method: str | None = None,
+    configured_tools: dict[str, str] | None = None,
+) -> int:
+    """Check that every command this run will invoke actually resolves.
+
+    The commands come from the run's own ``tools:`` configuration, so a
+    tool pointed at a custom path passes, and a tool pointed at a path that
+    does not exist fails here rather than mid-run.
+    """
     missing: list[str] = []
-    for dep in dependencies:
+    for dep in DEFAULT_RUNTIME_DEPENDENCIES:
         if shutil.which(dep) is None:
             missing.append(dep)
+    for name in required_tool_names(include_rscape=include_rscape, null_method=null_method):
+        command = tool_command(name, configured_tools)
+        tokens = shlex.split(command)
+        executable = tokens[0] if tokens else ""
+        if not executable or shutil.which(executable) is None:
+            missing.append(
+                command if command == executable else f"{executable} (from {name}: {command})"
+            )
 
     if missing:
         print("Missing runtime dependencies:", file=sys.stderr)
@@ -224,73 +297,29 @@ def extract_configfile_arg(snakemake_args: list[str]) -> str | None:
     return None
 
 
-def load_configured_tools(configfile: str) -> dict[str, str]:
+def load_config_payload(configfile: str) -> dict:
     config_path = Path(configfile)
     if not config_path.is_file():
         return {}
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    tools = payload.get("tools", {}) or {}
+    return yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+
+
+def load_configured_tools(configfile: str) -> dict[str, str]:
+    tools = load_config_payload(configfile).get("tools", {}) or {}
     return {str(key): str(value) for key, value in tools.items()}
 
 
 def show_tool_paths(configfile: str, include_rscape: bool) -> int:
     configured_tools = load_configured_tools(configfile)
-    tool_names = [
-        "rnalalifold",
-        "remove_gaponly",
-        "strip_aln",
-        "legacy_postprocess",
-        "eslreformat",
-        "rnaz",
-        "alifoldz",
-        "rnaalifold",
-        "ps2eps",
-        "epstopdf",
-        "refold",
-        "rnafold",
-        "magick",
-        "cmbuild",
-        "cmcalibrate",
-        "sissiz",
-        "rnaz_randomize_aln",
-        "null_model",
-        "calibration",
-        "benchmark",
-        "dereplicate",
-        "versions",
-    ]
+    # Union, so a tool key configured for this run is reported even if RNAcs
+    # itself has no default for it.
+    tool_names = sorted((set(DEFAULT_TOOL_COMMANDS) | set(configured_tools)) - {"rscape"})
     if include_rscape:
         tool_names.append("rscape")
 
-    default_commands = {
-        "rnalalifold": "RNALalifold",
-        "remove_gaponly": "python3 -m rnaconsnake.tools.remove_gaponly",
-        "strip_aln": "python3 -m rnaconsnake.tools.strip_aln",
-        "legacy_postprocess": "python3 -m rnaconsnake.tools.legacy_postprocess",
-        "eslreformat": "esl-reformat",
-        "rnaz": "RNAz",
-        "alifoldz": "alifoldz.pl",
-        "rnaalifold": "RNAalifold",
-        "ps2eps": "ps2eps",
-        "epstopdf": "epstopdf",
-        "refold": "refold.pl",
-        "rnafold": "RNAfold",
-        "magick": "magick",
-        "cmbuild": "cmbuild",
-        "cmcalibrate": "cmcalibrate",
-        "rscape": "R-scape",
-        "sissiz": "SISSIz",
-        "rnaz_randomize_aln": "rnazRandomizeAln.pl",
-        "null_model": "python3 -m rnaconsnake.tools.null_model",
-        "calibration": "python3 -m rnaconsnake.tools.calibration",
-        "benchmark": "python3 -m rnaconsnake.tools.benchmark",
-        "dereplicate": "python3 -m rnaconsnake.tools.dereplicate",
-        "versions": "python3 -m rnaconsnake.tools.versions",
-    }
-
     print(f"Tool resolution using config: {Path(configfile).resolve()}")
     for name in tool_names:
-        command = configured_tools.get(name, default_commands[name])
+        command = tool_command(name, configured_tools)
         tokens = shlex.split(command)
         executable = tokens[0] if tokens else ""
         resolved = shutil.which(executable) if executable else None
@@ -325,15 +354,59 @@ def split_passthrough_config(passthrough: list[str]) -> tuple[list[str], list[st
 
 
 def load_config_section(configfile: str, key: str) -> dict:
-    config_path = Path(configfile)
-    if not config_path.is_file():
-        return {}
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    payload = load_config_payload(configfile)
     # An unquoted ``null:`` key in YAML parses as the null scalar.
     section = payload.get(key)
     if section is None and key == "null":
         section = payload.get(None)
     return dict(section or {})
+
+
+def passthrough_config_overrides(snakemake_args: list[str]) -> dict:
+    """``--config key=value`` entries the user passed through to snakemake.
+
+    The preflight has to see them: ``--config do_rscape=True`` enables a branch
+    with its own dependency, exactly as ``--rscape`` does. Values are parsed as
+    Python literals where possible, which is how snakemake reads them too.
+    """
+    passthrough = list(snakemake_args or [])
+    if passthrough and passthrough[0] == "--":
+        passthrough = passthrough[1:]
+    _, entries = split_passthrough_config(passthrough)
+    overrides: dict = {}
+    for entry in entries:
+        if "=" not in entry:
+            continue
+        key, _, raw = entry.partition("=")
+        try:
+            overrides[key.strip()] = ast.literal_eval(raw)
+        except (SyntaxError, ValueError):
+            overrides[key.strip()] = raw
+    return overrides
+
+
+def _truthy(*values) -> bool:
+    for value in values:
+        if isinstance(value, str):
+            if value.strip().lower() in {"true", "yes", "1"}:
+                return True
+        elif value:
+            return True
+    return False
+
+
+def null_arm_enabled(null_settings) -> bool:
+    """Whether a run with these ``null:`` settings produces a calibration.
+
+    Decided by the same ``NullSettings`` the workflow itself uses, so the CLI
+    cannot disagree with the snakefile about whether a run is calibrated.
+    """
+    if not isinstance(null_settings, dict):
+        return False
+    try:
+        return NullSettings.from_config({"null": null_settings}).enabled
+    except (TypeError, ValueError):
+        return False
 
 
 def resolve_null_config(args: argparse.Namespace, configfile: str) -> dict | None:
@@ -510,14 +583,42 @@ def main() -> int:
     configfile = extract_configfile_arg(args.snakemake_args) or default_configfile
     if args.show_tool_paths:
         return show_tool_paths(configfile=configfile, include_rscape=args.rscape)
+    configured_tools = load_configured_tools(configfile)
+    overrides = passthrough_config_overrides(args.snakemake_args)
     null_config = resolve_null_config(args, configfile)
-    null_method = null_config["method"] if null_config else None
+    # A run is calibrated when the CLI asks for it, when a --config override
+    # asks for it, or when the config file already has the arm switched on.
+    effective_null = null_config or overrides.get("null") or load_config_section(configfile, "null")
+    null_method = effective_null.get("method") if effective_null else None
+    if null_method == "none":
+        null_method = None
+    include_rscape = args.rscape or _truthy(
+        overrides.get("do_rscape"), load_config_payload(configfile).get("do_rscape")
+    )
     if args.check_deps:
-        return check_dependencies(include_rscape=args.rscape, null_method=null_method)
+        return check_dependencies(
+            include_rscape=include_rscape,
+            null_method=null_method,
+            configured_tools=configured_tools,
+        )
     if not args.input_alignment:
         print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
         return 2
-    dep_status = check_dependencies(include_rscape=args.rscape, null_method=null_method)
+    if args.benchmark and not null_arm_enabled(effective_null):
+        # The recovery table scores results/calibration/qvalues.tsv, which only
+        # the null arm produces; without it snakemake fails with a missing-rule
+        # error that says nothing about the cause.
+        print(
+            "--benchmark scores the calibrated loci, so it needs the null-model arm. "
+            "Add --null-arm sissiz (or set null.method in the config file).",
+            file=sys.stderr,
+        )
+        return 2
+    dep_status = check_dependencies(
+        include_rscape=include_rscape,
+        null_method=null_method,
+        configured_tools=configured_tools,
+    )
     if dep_status != 0:
         return dep_status
 

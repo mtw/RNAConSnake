@@ -61,6 +61,26 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - `parse_stockholm_records` silently truncated interleaved Stockholm alignments
   to their last block.
 - The export bundle now resolves `arms/real/` when the null-model arm is enabled.
+- **The dependency preflight checked the wrong commands.** It resolved hard-coded
+  program names, so a tool redirected through `tools:` in the config file was
+  never checked at the path the run would actually use, and branches switched on
+  in the config file (`do_rscape`, `null.method`) contributed no dependencies
+  unless they were also passed as flags.
+- **`--benchmark` produced a recovery count with no null baseline.** The rule now
+  passes every null arm's locus tables to the benchmark, so the report states how
+  many elements the null arms "recover" too. `--benchmark` without the null arm
+  now fails immediately with an explanation, rather than on a missing rule for
+  the calibrated table it scores.
+- **AlifoldZ was ranked in opposite directions in different places.**
+  De-replication treats a more negative z-score as the stronger one; the summary
+  reports and the export bundle sorted the raw score, ranking `-2` above `-3`.
+- **`results/calibration/summary.json` omitted clustering parameters that change
+  the q-values** (`max_container_width`, `container_min_coverage`,
+  `representative_rule` under `thresholds`), and the export manifest copied that
+  incomplete block downstream.
+- **Only the default curated truth file was packaged.** `benchmark_truth` can
+  name any file in `resources/benchmark/`, but the build hook copied one of
+  them, so an installed run could not resolve the others.
 
 ### Changed
 - **The command-line tool is now `RNAcs`.** `rnaconsnake-run` remains a

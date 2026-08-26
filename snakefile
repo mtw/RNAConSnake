@@ -1033,6 +1033,27 @@ rule emit_versions:
         run_checked(cmd)
 
 
+def benchmark_null_loci():
+    """Each null arm's locus tables, one per window length.
+
+    A recovery count on its own is uninterpretable: reported loci cover much of
+    an alignment, so the overlap test can be satisfied by chance. The benchmark
+    reports how many elements the null arms "recover" too, which needs their
+    locus tables here. Grouped per arm, because the tables of one arm pool into
+    one baseline sample -- passing them as separate arms would count each window
+    length as its own replicate and understate the baseline.
+    """
+    if not NULL_ARM_ENABLED:
+        return {}
+    return {
+        arm: [
+            f"arms/{arm}/generated_files/summary/len_{wlen}/RNAConSnake.nr.csv"
+            for wlen in MAXBPSPAN
+        ]
+        for arm in NULL.null_arms()
+    }
+
+
 rule benchmark_recovery:
     """Positive control: recovery of curated known elements at a given q.
 
@@ -1041,7 +1062,8 @@ rule benchmark_recovery:
     """
     input:
         truth=BENCHMARK_TRUTH,
-        qvalues=f"{CALIBRATION_DIR}/qvalues.tsv"
+        qvalues=f"{CALIBRATION_DIR}/qvalues.tsv",
+        null_loci=[path for paths in benchmark_null_loci().values() for path in paths]
     output:
         f"{BENCHMARK_DIR}/flavivirus_recovery.tsv"
     log:
@@ -1049,7 +1071,8 @@ rule benchmark_recovery:
     params:
         alignment=BENCHMARK_ALIGNMENT,
         min_overlap=BENCHMARK_MIN_OVERLAP,
-        allow_uncurated=BENCHMARK_ALLOW_UNCURATED
+        allow_uncurated=BENCHMARK_ALLOW_UNCURATED,
+        null_loci_by_arm=benchmark_null_loci()
     threads:
         1
     run:
@@ -1058,12 +1081,14 @@ rule benchmark_recovery:
             "--truth", input.truth,
             "--qvalues", input.qvalues,
             "--output", output[0],
-            "--min-overlap-fraction", str(BENCHMARK_MIN_OVERLAP),
+            "--min-overlap-fraction", str(params.min_overlap),
         ]
-        if BENCHMARK_ALIGNMENT:
-            cmd += ["--alignment", str(BENCHMARK_ALIGNMENT)]
-        if BENCHMARK_ALLOW_UNCURATED:
+        if params.alignment:
+            cmd += ["--alignment", str(params.alignment)]
+        if params.allow_uncurated:
             cmd.append("--allow-uncurated")
+        for arm in sorted(params.null_loci_by_arm):
+            cmd += ["--null-loci", *params.null_loci_by_arm[arm]]
         run_checked(cmd, stderr_path=log[0])
 
 

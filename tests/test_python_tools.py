@@ -243,6 +243,69 @@ def test_cli_check_deps_reports_missing_rscape_when_requested() -> None:
     assert "R-scape" in result.stderr
 
 
+def test_cli_check_deps_checks_the_configured_tool_command(tmp_path: Path) -> None:
+    """A tool pointed at a custom path must be checked at that path.
+
+    Checking the hard-coded program name instead both fails runs that would
+    have worked and passes runs that then die mid-pipeline.
+    """
+    configfile = tmp_path / "config.yaml"
+    configfile.write_text(
+        "tools:\n  alifoldz: /nonexistent/dir/alifoldz.pl\n", encoding="utf-8"
+    )
+    result = subprocess.run(
+        [PYTHON, "-m", "rnaconsnake.cli", "--check-deps", "--", "--configfile", str(configfile)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    assert result.returncode == 2
+    assert "/nonexistent/dir/alifoldz.pl" in result.stderr
+
+
+def test_cli_check_deps_honours_optional_branches_from_the_config_file(tmp_path: Path) -> None:
+    """`do_rscape` and `null.method` enable branches with their own tools,
+    whether they are switched on by flag or in the config file."""
+    configfile = tmp_path / "config.yaml"
+    configfile.write_text(
+        'do_rscape: true\n"null":\n  method: sissiz\n  replicates: 2\n', encoding="utf-8"
+    )
+    env = subprocess_env()
+    env["PATH"] = str(Path(PYTHON).resolve().parent)
+    result = subprocess.run(
+        [PYTHON, "-m", "rnaconsnake.cli", "--check-deps", "--", "--configfile", str(configfile)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 2
+    assert "R-scape" in result.stderr
+    assert "SISSIz" in result.stderr
+
+
+def test_cli_benchmark_requires_the_null_arm(tmp_path: Path) -> None:
+    """The recovery table scores the calibrated loci, which only the null arm
+    produces. Snakemake's own error for the missing rule names neither."""
+    alignment = tmp_path / "input.stk"
+    alignment.write_text("# STOCKHOLM 1.0\n//\n", encoding="utf-8")
+    result = subprocess.run(
+        [
+            PYTHON, "-m", "rnaconsnake.cli",
+            "--input-alignment", str(alignment),
+            "--benchmark",
+            "--cores", "1",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    assert result.returncode == 2
+    assert "--null-arm" in result.stderr
+
+
 def test_cli_show_tool_paths_reports_configured_commands() -> None:
     result = subprocess.run(
         [PYTHON, "-m", "rnaconsnake.cli", "--show-tool-paths"],
@@ -524,6 +587,8 @@ def test_extract_rnaz_reads_probability_sci_and_consensus_mfe(tmp_path: Path) ->
 
 
 def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path: Path) -> None:
+    """Ties on covariation break towards the *more negative* AlifoldZ, which is
+    the more significant one -- the ordering de-replication also uses."""
     summary_a = tmp_path / "a.summary.json"
     summary_b = tmp_path / "b.summary.json"
     summary_c = tmp_path / "c.summary.json"
@@ -606,9 +671,36 @@ def test_write_summary_outputs_sorts_records_by_maxcovar_then_alifoldz(tmp_path:
     )
 
     csv_lines = read_text(tmp_path / "RNAConSnake.log.csv").splitlines()
-    assert csv_lines[1].startswith("rec_b,")
-    assert csv_lines[2].startswith("rec_c,")
+    # rec_b and rec_c tie on maxcovarval 5; rec_c's AlifoldZ of -3.0 beats -2.0.
+    assert csv_lines[1].startswith("rec_c,")
+    assert csv_lines[2].startswith("rec_b,")
     assert csv_lines[3].startswith("rec_a,")
+
+
+def test_alifoldz_ranks_the_same_way_everywhere(tmp_path: Path) -> None:
+    """A more negative AlifoldZ is the more significant one. Every place that
+    orders candidates by it has to agree, or the export bundle and the run's
+    own reports disagree with the locus representative de-replication picked."""
+    from rnaconsnake.export_bundle import SummaryRecord, sort_summary_records
+    from rnaconsnake.tools.dereplicate import rank_key
+    from rnaconsnake.tools.legacy_postprocess import _report_sort_key
+
+    weak = {"maxcovarval": "5", "alifoldzscore": "-2.0", "rnazprob": "0.9"}
+    strong = {"maxcovarval": "5", "alifoldzscore": "-3.0", "rnazprob": "0.9"}
+    missing = {"maxcovarval": "5", "alifoldzscore": "NA", "rnazprob": "0.9"}
+
+    assert _report_sort_key(strong) > _report_sort_key(weak) > _report_sort_key(missing)
+    assert rank_key(strong) > rank_key(weak) > rank_key(missing)
+
+    records = [
+        SummaryRecord(wlen=100, values=dict(values, wbn=name), summary_path=tmp_path / name)
+        for name, values in [("weak", weak), ("strong", strong), ("missing", missing)]
+    ]
+    assert [record.candidate_id for record in sort_summary_records(records)] == [
+        "strong",
+        "weak",
+        "missing",
+    ]
 
 
 def test_legacy_postprocess_removed_render_reports_subcommand(tmp_path: Path) -> None:
@@ -1719,6 +1811,39 @@ def _candidate_rows(prob: float, alifoldz: float, rscape: str, count: int = 4) -
             }
         )
     return rows
+
+
+def test_calibration_summary_records_every_clustering_parameter(tmp_path: Path) -> None:
+    """Clustering decides how many loci each arm reports, and the q-values are
+    counts over loci. A summary missing those parameters cannot be reproduced
+    from -- and the export manifest copies this block verbatim."""
+    from dataclasses import fields
+
+    from rnaconsnake.tools.calibration import Thresholds, calibrate
+
+    arm_inputs = {
+        "real": {100: _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "2"))},
+    }
+    for index in range(2):
+        arm = f"null_{index:03d}"
+        arm_inputs[arm] = {
+            100: _write_summary_csv(tmp_path / f"{arm}.csv", _candidate_rows(0.20, 0.5, "0"))
+        }
+
+    summary = calibrate(
+        arm_inputs=arm_inputs,
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        null_metadata={"method": "rnazRandomizeAln", "seed": 1, "warnings": []},
+        output_dir=tmp_path / "calibration",
+        two_stage=True,
+    )
+
+    recorded = summary["thresholds"]
+    for field in fields(Thresholds):
+        assert field.name in recorded, f"{field.name} is not recorded in summary.json"
+    assert recorded["max_container_width"] == 120
+    assert recorded["container_min_coverage"] == pytest.approx(0.8)
+    assert recorded["representative_rule"] == "widest"
 
 
 def test_calibrate_writes_funnel_qvalues_and_summary(tmp_path: Path) -> None:
@@ -3711,6 +3836,62 @@ def test_recovery_report_is_quiet_when_the_margin_is_real(tmp_path: Path) -> Non
     assert "WARNING" not in text
 
 
+def test_one_null_loci_group_is_one_arm(tmp_path: Path) -> None:
+    """An arm's window lengths pool into a single baseline sample.
+
+    Counting each window length as its own arm would dilute the mean with
+    partial views of the same arm, and understate the baseline.
+    """
+    truth_path = tmp_path / "truth.tsv"
+    truth_path.write_text(
+        "element_id\telement_class\talignment\tstart\tend\tnotes\n"
+        "e1\txrRNA\taln\t100\t199\tfirst\n"
+        "e2\tDB\taln\t400\t499\tsecond\n",
+        encoding="utf-8",
+    )
+    qvalues = tmp_path / "qvalues.tsv"
+    qvalues.write_text(
+        "locus_id\twlen\tstart\tend\trnazprob\talifoldzscore\n"
+        "len100_0001\t100\t90\t210\t0.99\t-3.0\n",
+        encoding="utf-8",
+    )
+    header = "locus_id,locus_start,locus_end,n_windows,members,wbn,rnazprob,alifoldzscore\n"
+    len100 = tmp_path / "len100.nr.csv"
+    len100.write_text(header + "len100_0001,90,210,1,a,a,0.99,-3.0\n", encoding="utf-8")
+    len200 = tmp_path / "len200.nr.csv"
+    len200.write_text(header + "len200_0001,390,510,1,b,b,0.99,-3.0\n", encoding="utf-8")
+
+    output = tmp_path / "recovery.tsv"
+    subprocess.run(
+        [
+            PYTHON, "-m", "rnaconsnake.tools.benchmark",
+            "--truth", str(truth_path),
+            "--qvalues", str(qvalues),
+            "--output", str(output),
+            "--alignment", "aln",
+            "--null-loci", str(len100), str(len200),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    text = read_text(output)
+    # One arm, recovering both elements -- not two arms recovering one each.
+    assert "over 1 null arms" in text
+    assert "# null_baseline_recovered\tmean 2.0" in text
+
+
+def test_benchmark_rule_passes_every_null_arm_as_one_group() -> None:
+    """The recovery table is uninterpretable without the null baseline, so the
+    rule that builds it has to supply the arms' locus tables itself."""
+    text = read_text(Path("snakefile"))
+    rule = text.split("rule benchmark_recovery:", 1)[1].split("\nrule ", 1)[0]
+    assert "null_loci=" in rule
+    assert 'cmd += ["--null-loci", *params.null_loci_by_arm[arm]]' in rule
+    assert "for arm in sorted(params.null_loci_by_arm)" in rule
+
+
 def test_reciprocal_overlap_exposes_an_oversized_locus(tmp_path: Path) -> None:
     """A locus far larger than the element scores 1.0 on overlap_fraction.
 
@@ -3808,6 +3989,43 @@ def test_configuration_is_locked_to_the_recorded_values() -> None:
     # The limitations must stay stated, not quietly dropped.
     assert "DB2 is not recovered" in lock
     assert "sensitive to a single element" in lock
+
+
+def test_every_curated_truth_file_is_packaged() -> None:
+    """`benchmark_truth` names a file in resources/benchmark by name, and an
+    installed run resolves it inside the package. A truth file left out of the
+    build hook exists in the repository and nowhere else."""
+    import importlib.util
+    import types
+
+    # setup.py is read for its copy list alone, so setuptools is stubbed rather
+    # than required: the test env does not build the package.
+    setuptools = types.ModuleType("setuptools")
+    setuptools.setup = lambda **kwargs: None
+    command = types.ModuleType("setuptools.command")
+    build_py = types.ModuleType("setuptools.command.build_py")
+    build_py.build_py = type("build_py", (), {"run": lambda self: None})
+    stubs = {
+        "setuptools": setuptools,
+        "setuptools.command": command,
+        "setuptools.command.build_py": build_py,
+    }
+    saved = {name: sys.modules.get(name) for name in stubs}
+    sys.modules.update(stubs)
+    try:
+        spec = importlib.util.spec_from_file_location("_rnaconsnake_setup", Path("setup.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        for name, previous in saved.items():
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+
+    packaged = {source.name for source in module.WORKFLOW_SOURCES}
+    for truth in sorted(Path("resources/benchmark").glob("*.tsv")):
+        assert truth.name in packaged, f"{truth.name} is not copied into the package"
 
 
 # --- sensitivity envelope ---------------------------------------------------

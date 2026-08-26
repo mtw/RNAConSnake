@@ -170,23 +170,29 @@ def _load_summary_records(paths: list[str]) -> list[dict[str, str]]:
     return normalized
 
 
-def _numeric_value(value: str) -> float:
+def _numeric_value(value: str, default: float = float("-inf")) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
-        return float("-inf")
+        return default
+
+
+def _report_sort_key(record: dict[str, str]) -> tuple[float, float]:
+    """Report order: strongest covariation first, then strongest AlifoldZ.
+
+    AlifoldZ is negated because a *more negative* z-score is the more
+    significant one -- the same ordering de-replication uses to pick a locus
+    representative. Missing values rank last in both positions.
+    """
+    return (
+        _numeric_value(record.get("maxcovarval", "")),
+        -_numeric_value(record.get("alifoldzscore", ""), default=float("inf")),
+    )
 
 
 def cmd_render_reports(args: argparse.Namespace) -> int:
     records = _load_summary_records(args.inputs)
-    records = sorted(
-        records,
-        key=lambda record: (
-            _numeric_value(record.get("maxcovarval", "")),
-            _numeric_value(record.get("alifoldzscore", "")),
-        ),
-        reverse=True,
-    )
+    records = sorted(records, key=_report_sort_key, reverse=True)
     for path in [args.log, args.csv, args.markdown]:
         if path:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
