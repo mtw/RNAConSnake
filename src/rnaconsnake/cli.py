@@ -38,8 +38,7 @@ DEFAULT_TOOL_COMMANDS = {
     "rnaalifold": "RNAalifold",
     "ps2eps": "ps2eps",
     "epstopdf": "epstopdf",
-    "refold": "refold.pl",
-    "rnafold": "RNAfold",
+    "refold": "python3 -m rnaconsnake.tools.refold",
     "magick": "magick",
     "cmbuild": "cmbuild",
     "cmcalibrate": "cmcalibrate",
@@ -66,8 +65,6 @@ DEFAULT_RUNTIME_TOOLS = [
     "rnaalifold",
     "ps2eps",
     "epstopdf",
-    "refold",
-    "rnafold",
     "magick",
 ]
 
@@ -255,6 +252,19 @@ def required_tool_names(include_rscape: bool = False, null_method: str | None = 
     return tools
 
 
+def viennarna_bindings_version() -> str | None:
+    """``RNA.__version__``, or ``None`` when the module is not importable.
+
+    Refolding runs through the bindings rather than ``refold.pl``, so they are
+    as much a runtime dependency as the binaries are.
+    """
+    try:
+        import RNA
+    except ImportError:
+        return None
+    return str(getattr(RNA, "__version__", "unknown"))
+
+
 def check_dependencies(
     include_rscape: bool = False,
     null_method: str | None = None,
@@ -270,6 +280,9 @@ def check_dependencies(
     for dep in DEFAULT_RUNTIME_DEPENDENCIES:
         if shutil.which(dep) is None:
             missing.append(dep)
+    bindings = viennarna_bindings_version()
+    if bindings is None:
+        missing.append("the ViennaRNA Python module (conda: viennarna, pip: ViennaRNA)")
     for name in required_tool_names(include_rscape=include_rscape, null_method=null_method):
         command = tool_command(name, configured_tools)
         tokens = shlex.split(command)
@@ -283,8 +296,55 @@ def check_dependencies(
             print(f"  - {dep}", file=sys.stderr)
         return 2
 
+    warn_on_viennarna_mismatch(bindings, configured_tools)
     print("All external runtime dependencies are available.")
     return 0
+
+
+def warn_on_viennarna_mismatch(bindings: str | None, configured_tools: dict[str, str] | None = None) -> None:
+    """Say so when the bindings and the binaries are different ViennaRNA builds.
+
+    The consensus structure comes from the ``RNAalifold`` binary and the refold
+    from the Python module. Different builds mean different energy parameters
+    in one run, which is exactly the kind of thing a recorded calibration
+    cannot be reproduced through.
+    """
+    if not bindings:
+        return
+    binary = probe_version(tool_command("rnaalifold", configured_tools))
+    if binary and bindings not in binary:
+        print(
+            f"Warning: ViennaRNA Python module {bindings} alongside {binary.strip()}. "
+            "One run would mix two builds' energy parameters.",
+            file=sys.stderr,
+        )
+
+
+def probe_version(command: str) -> str:
+    """First line of ``<command> --version``, empty when it cannot be asked."""
+    tokens = shlex.split(command)
+    if not tokens or shutil.which(tokens[0]) is None:
+        return ""
+    try:
+        # In a scratch directory: ViennaRNA tools write side outputs into
+        # whatever directory they are run from, and this one runs wherever the
+        # user happened to invoke RNAcs.
+        with tempfile.TemporaryDirectory() as scratch:
+            result = subprocess.run(
+                [*tokens, "--version"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=20,
+                cwd=scratch,
+            )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    for line in ((result.stdout or "") + "\n" + (result.stderr or "")).splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
 
 
 def extract_configfile_arg(snakemake_args: list[str]) -> str | None:

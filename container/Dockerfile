@@ -1,10 +1,10 @@
 # RNAcs container — linux/arm64 (Apple Silicon native).
 #
-# Most of the toolchain comes from conda-forge/bioconda. Four pieces do not and
+# Most of the toolchain comes from conda-forge/bioconda. Three pieces do not and
 # are handled explicitly: SISSIz is absent from bioconda and is compiled from
-# source; alifoldz.pl and refold.pl ship in the RNAz and ViennaRNA source
-# tarballs but not in their conda packages; ps2eps and epstopdf come from
-# Debian.
+# source; alifoldz.pl ships in the RNAz source tarball but not in its conda
+# package; ps2eps and epstopdf come from Debian. Refolding needs no binary at
+# all -- it runs through the ViennaRNA Python module.
 #
 # Build context must contain vendor/ — run container/prepare-context.sh first.
 
@@ -43,14 +43,14 @@ RUN cd /tmp/SISSIz \
     && cd / && rm -rf /tmp/SISSIz \
     && SISSIz --version
 
-# --- Perl helpers the conda packages omit ------------------------------------
-# These carry the shebang of whatever perl the host had (e.g. Homebrew's),
-# which does not exist here. Repoint them at the container's own perl.
-COPY vendor/perl/alifoldz.pl vendor/perl/refold.pl /usr/local/bin/
-RUN sed -i "1s|^#!.*perl|#!/opt/conda/bin/perl|" /usr/local/bin/alifoldz.pl /usr/local/bin/refold.pl \
-    && chmod +x /usr/local/bin/alifoldz.pl /usr/local/bin/refold.pl \
-    && head -1 /usr/local/bin/alifoldz.pl /usr/local/bin/refold.pl \
-    && perl -c /usr/local/bin/alifoldz.pl && perl -c /usr/local/bin/refold.pl
+# --- Perl helper the conda package omits -------------------------------------
+# It carries the shebang of whatever perl the host had (e.g. Homebrew's),
+# which does not exist here. Repoint it at the container's own perl.
+COPY vendor/perl/alifoldz.pl /usr/local/bin/
+RUN sed -i "1s|^#!.*perl|#!/opt/conda/bin/perl|" /usr/local/bin/alifoldz.pl \
+    && chmod +x /usr/local/bin/alifoldz.pl \
+    && head -1 /usr/local/bin/alifoldz.pl \
+    && perl -c /usr/local/bin/alifoldz.pl
 
 # --- RNAConSnake itself ------------------------------------------------------
 COPY rnaconsnake /opt/rnaconsnake

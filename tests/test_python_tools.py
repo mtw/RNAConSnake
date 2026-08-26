@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -117,6 +118,10 @@ import sys
 from pathlib import Path
 
 args = sys.argv[1:]
+if "--version" in args:
+    # The real binary prints and exits; it does not fold, and must not write.
+    print("RNAalifold 2.7.2")
+    raise SystemExit(0)
 prefix = "fake"
 for i, arg in enumerate(args):
     if arg == "--id-prefix" and i + 1 < len(args):
@@ -161,19 +166,6 @@ from pathlib import Path
 inp = Path(sys.argv[1])
 out = inp.with_suffix(".pdf")
 out.write_text("%PDF-FAKE\\n", encoding="utf-8")
-""",
-        "refold.pl": """\
-#!/usr/bin/env python3
-print(">fake")
-print("ACGUACGU")
-""",
-        "RNAfold": """\
-#!/usr/bin/env python3
-import sys
-_ = sys.stdin.read()
-print(">fake")
-print("ACGUACGU")
-print("<<<<....>>>> (-1.0)")
 """,
         "magick": """\
 #!/usr/bin/env python3
@@ -1206,6 +1198,9 @@ def test_verify_run_consistency_reports_changed_cleaned_alignment(tmp_path: Path
     assert "len_150: cleaned alignments: content differs" in result.stdout
 
 
+_REFOLD_RECORD = re.compile(r"^> \S+\n[ACGUN]+\n[().]+ \( *-?\d+\.\d\d\)$", re.M)
+
+
 def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     input_alignment = tmp_path / "my_input.stk"
     export_dir = tmp_path / "bundle"
@@ -1284,6 +1279,15 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.md").is_file()
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.nr.csv").is_file()
     assert not (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.html").exists()
+    refold_out = read_text(
+        tmp_path / "generated_files" / "refold" / "len_150" / "RC_150_0001_aln_1_12_refold.out"
+    )
+    # One record per sequence, as RNAfold -C wrote them before the module took
+    # the leg over; the rule no longer needs its own empty-output guard because
+    # refold fails on an alignment it cannot read.
+    assert refold_out.startswith("> ")
+    assert refold_out.count("> ") == 2
+    assert _REFOLD_RECORD.search(refold_out), refold_out
     png_dir = tmp_path / "generated_files" / "png" / "len_150"
     assert (png_dir / "manifest.txt").is_file()
     assert (png_dir / "RC_150_0001_aln_1_12_aln.png").is_file()
@@ -2072,6 +2076,82 @@ def test_versions_report_records_python_and_external_tools(tmp_path: Path) -> No
     assert text.startswith("# RNAcs toolchain versions")
     assert "python:" in text
     assert "external_tools:" in text
+    # Refolding runs through the ViennaRNA Python module, so its version is
+    # part of the toolchain a calibrated run has to be reproducible against.
+    assert "viennarna_bindings:" in text
+    assert payload["viennarna_bindings"]["module"] == "RNA"
+
+
+def test_the_refold_leg_no_longer_needs_perl_or_rnafold() -> None:
+    """The refold leg is ours now. refold.pl and the RNAfold binary must not
+    creep back in through the workflow, the config, or the preflight."""
+    import yaml as _yaml
+
+    # The rule may still name the pipe it replaced; it must not invoke it.
+    snakefile = read_text(Path("snakefile"))
+    assert 'command_tokens("refold", "python3 -m rnaconsnake.tools.refold")' in snakefile
+    assert 'command_tokens("rnafold"' not in snakefile
+    assert '"refold.pl"' not in snakefile
+
+    config = _yaml.safe_load(read_text(Path("config.yaml")))
+    assert config["tools"]["refold"] == "python3 -m rnaconsnake.tools.refold"
+    assert "rnafold" not in config["tools"]
+
+    # Not an executable to look for on PATH any more.
+    assert "refold" not in cli.DEFAULT_RUNTIME_TOOLS
+    assert "rnafold" not in cli.DEFAULT_RUNTIME_TOOLS
+    assert cli.DEFAULT_TOOL_COMMANDS["refold"].startswith("python3 -m rnaconsnake")
+
+
+def test_check_deps_requires_the_viennarna_python_module(monkeypatch) -> None:
+    """The bindings are as much a runtime dependency as the binaries, and the
+    preflight is where a missing one has to surface."""
+    monkeypatch.setattr(cli, "viennarna_bindings_version", lambda: None)
+    assert cli.check_dependencies() == 2
+
+
+def test_check_deps_warns_when_bindings_and_binaries_disagree(capsys) -> None:
+    """The consensus comes from the RNAalifold binary and the refold from the
+    module: two builds in one run means two sets of energy parameters."""
+    cli.warn_on_viennarna_mismatch("9.9.9", {"rnaalifold": "RNAalifold"})
+    captured = capsys.readouterr()
+    if not captured.err:
+        pytest.skip("RNAalifold is not installed, so there is nothing to compare against")
+    assert "9.9.9" in captured.err
+    assert "energy parameters" in captured.err
+
+
+def test_version_probes_do_not_write_into_the_working_directory(tmp_path: Path) -> None:
+    """ViennaRNA tools drop side outputs wherever they are run, and the version
+    probe runs in the user's own directory."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    litterbug = bin_dir / "litterbug"
+    litterbug.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "Path('side_output.ps').write_text('%!PS\\n', encoding='utf-8')\n"
+        "print('litterbug 1.0')\n",
+        encoding="utf-8",
+    )
+    litterbug.chmod(0o755)
+
+    here = tmp_path / "cwd"
+    here.mkdir()
+    monkeypatched_path = f"{bin_dir}:{os.environ['PATH']}"
+    original_path, original_cwd = os.environ["PATH"], os.getcwd()
+    os.environ["PATH"] = monkeypatched_path
+    os.chdir(here)
+    try:
+        assert cli.probe_version("litterbug") == "litterbug 1.0"
+        from rnaconsnake.tools.versions import probe
+
+        assert probe("litterbug", ["--version"])["version"] == "litterbug 1.0"
+    finally:
+        os.chdir(original_cwd)
+        os.environ["PATH"] = original_path
+
+    assert not list(here.iterdir()), "a version probe wrote into the working directory"
 
 
 def test_cli_reports_program_name_rnacs() -> None:
@@ -2478,7 +2558,7 @@ def test_split_passthrough_config_merges_user_entries() -> None:
     assert cli.split_passthrough_config(["-C", "x=1"]) == ([], ["x=1"])
 
 
-# --- refold.pl hang / lower-case alignment regression ---------------------
+# --- lower-case alignment regression --------------------------------------
 
 
 LOWERCASE_CLUSTAL = "\n".join(
@@ -2495,7 +2575,12 @@ LOWERCASE_CLUSTAL = "\n".join(
 
 
 def test_clean_clustal_uppercases_sequences_for_refold(tmp_path: Path) -> None:
-    """refold.pl only matches [A-Z-] rows; lower-case input parses to nothing."""
+    """The cleaned Clustal is a recorded artifact, and it stays upper-case.
+
+    It was refold.pl that forced this -- it matches [A-Z-] rows and read a
+    lower-case alignment as nothing at all. The Python refold that replaced it
+    reads any case, but the artifact contract has not changed.
+    """
     source = tmp_path / "in.aln"
     source.write_text(LOWERCASE_CLUSTAL, encoding="utf-8")
     backup = tmp_path / "in.aln~"
@@ -2567,8 +2652,9 @@ def test_clean_clustal_is_a_noop_for_uppercase_alignments(tmp_path: Path) -> Non
 def test_run_checked_never_inherits_stdin(tmp_path: Path) -> None:
     """A tool that reads stdin must hit EOF, not block on the user's terminal.
 
-    refold.pl's <> falls through to STDIN once @ARGV is exhausted. Inheriting an
-    interactive terminal there parks the job forever and holds a scheduler slot.
+    Perl's <> falls through to STDIN once @ARGV is exhausted -- alifoldz.pl
+    still does. Inheriting an interactive terminal there parks the job forever
+    and holds a scheduler slot.
     """
     from rnaconsnake.workflow_helpers import run_checked
 
@@ -2686,7 +2772,7 @@ def test_extract_alifoldz_accepts_a_real_score(tmp_path: Path) -> None:
 
 
 def test_strip_aln_uppercases_sequences_for_the_perl_toolchain(tmp_path: Path) -> None:
-    """alifoldz.pl and refold.pl both match [A-Z...] with no /i flag."""
+    """alifoldz.pl matches [A-Z...] with no /i flag, and is still Perl."""
     source = tmp_path / "lower.stk"
     source.write_text(
         "# STOCKHOLM 1.0\n"
@@ -4203,7 +4289,7 @@ def test_readme_documents_the_tools_conda_cannot_supply() -> None:
 
     assert "https://github.com/mtw/SISSIz" in readme
     assert "https://github.com/mtw/SISSIz" in container
-    for tool in ["SISSIz", "alifoldz.pl", "refold.pl"]:
+    for tool in ["SISSIz", "alifoldz.pl"]:
         assert tool in readme, f"{tool} is not mentioned in the README"
     # The --use-conda limitation is a stated submission blocker; it must not
     # silently disappear from the docs.
@@ -4214,7 +4300,6 @@ def test_readme_documents_the_tools_conda_cannot_supply() -> None:
     prepare = read_text(Path("container/prepare-context.sh"))
     assert "github.com/mtw/SISSIz" in prepare
     assert "RNAz source tarball" in prepare
-    assert "ViennaRNA source tarball" in prepare
 
 
 def test_readme_covers_the_features_added_this_cycle() -> None:

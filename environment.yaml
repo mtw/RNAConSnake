@@ -17,6 +17,10 @@ dependencies:
   - python >=3.10
   - pip
   - snakemake >=8,<10
+  # Refolding runs through the ViennaRNA Python module, not RNAfold, so
+  # `python -c "import RNA"` has to work in this environment.
+  # RNAcs --check-deps verifies it and warns if the module and the
+  # binaries are different builds.
   - viennarna =2.7.2
   - rnaz =2.1
   # SISSIz is not on any conda channel; build from https://github.com/mtw/SISSIz

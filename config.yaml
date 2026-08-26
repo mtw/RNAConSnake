@@ -110,8 +110,7 @@ tools:
   rnaalifold: RNAalifold
   ps2eps: ps2eps
   epstopdf: epstopdf
-  refold: refold.pl
-  rnafold: RNAfold
+  refold: python3 -m rnaconsnake.tools.refold
   rscape: R-scape
   alifoldmaxcovar: python3 -m rnaconsnake.tools.alifold_maxcovar
   magick: magick

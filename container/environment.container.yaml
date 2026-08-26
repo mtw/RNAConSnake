@@ -4,7 +4,6 @@
 # separately in the Dockerfile:
 #   SISSIz        - built from source (null-model generator; the arm needs it)
 #   alifoldz.pl   - RNAz ships it in the source tarball, not in the conda package
-#   refold.pl     - likewise for ViennaRNA
 #   ps2eps        - Debian package
 #   epstopdf      - Debian texlive
 #   R-scape       - optional (do_rscape: false); omitted
@@ -15,6 +14,8 @@ dependencies:
   - snakemake>=8,<10
   - tqdm>=4,<5
   - pyyaml
+  # Refolding imports the ViennaRNA Python module rather than calling
+  # RNAfold, so this package must provide RNA for the env's python.
   - viennarna=2.7.2
   - rnaz=2.1
   - infernal=1.1.5

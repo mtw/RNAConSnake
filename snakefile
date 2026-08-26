@@ -614,46 +614,31 @@ rule clean_rnaalifold_clustal_file:
 
 
 rule run_refold_file:
+    """Refold each sequence under the consensus structure.
+
+    One tool, not the ``refold.pl | RNAfold -C`` pipe it replaces: the
+    constraints and the constrained fold both come from
+    ``rnaconsnake.tools.refold``, which needs only the ViennaRNA Python
+    bindings. It fails loudly on an alignment it cannot read, where the Perl
+    script exited 0 having silently parsed nothing.
+    """
     input:
         aln=A("generated_files/rnaalifold/len_{wlen}/{file}/{file}.RNAalifold_results.cleaned.aln"),
         dp_ps=A("generated_files/rnaalifold/len_{wlen}/{file}/{file}_dp.ps")
     output:
         A("generated_files/refold/len_{wlen}/{file}_refold.out")
+    threads:
+        1
     run:
         os.makedirs(os.path.dirname(output[0]), exist_ok=True)
-        refold_cmd = command_tokens("refold", "refold.pl") + [input.aln, input.dp_ps]
-        rnafold_cmd = command_tokens("rnafold", "RNAfold") + ["--noPS", "-C"]
-        with open(output[0], "w", encoding="utf-8") as out_handle:
-            # stdin=DEVNULL is load-bearing: refold.pl's <> falls through to
-            # STDIN once it has exhausted @ARGV, and would otherwise block on
-            # the user's terminal, holding a scheduler slot forever.
-            first = subprocess.Popen(
-                refold_cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True
-            )
-            try:
-                subprocess.run(
-                    rnafold_cmd,
-                    stdin=first.stdout,
-                    stdout=out_handle,
-                    text=True,
-                    check=True,
-                )
-            finally:
-                if first.stdout:
-                    first.stdout.close()
-                first.wait()
-                if first.returncode != 0:
-                    raise subprocess.CalledProcessError(first.returncode, refold_cmd)
-
-        # refold.pl exits 0 even when it parsed no sequences at all, so an
-        # empty result is the only signal that the alignment did not reach it
-        # in a form it understands.
-        if os.path.getsize(output[0]) == 0:
-            raise RuntimeError(
-                f"refold produced no output for {wildcards.file}; "
-                f"check {input.aln} - refold.pl only accepts upper-case Clustal "
-                "sequence rows and silently reads nothing otherwise"
-            )
+        run_checked(
+            command_tokens("refold", "python3 -m rnaconsnake.tools.refold")
+            + [
+                "--alignment", input.aln,
+                "--consensus", input.dp_ps,
+                "--output", output[0],
+            ]
+        )
 
 
 rule extract_refold_metrics_file:

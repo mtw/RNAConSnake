@@ -23,6 +23,11 @@ dev = [
   # Pinned to a minor series: the formatter's output can change between them,
   # and CI checks formatting.
   "ruff>=0.16,<0.17",
+  # The workflow tests run the refold leg, which imports RNA. Not a runtime
+  # dependency of the package: a real run takes its ViennaRNA -- module and
+  # binaries together -- from conda or the container, so that one install
+  # provides both.
+  "ViennaRNA>=2.6,<3",
 ]
 
 [project.scripts]

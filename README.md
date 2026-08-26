@@ -195,17 +195,22 @@ including how to move the image to another machine, are in
 
 RNAConSnake expects the external RNA analysis toolchain on `PATH`. Most of it
 installs from conda-forge/bioconda (see [`environment.yaml`](environment.yaml));
-three pieces do not and must be installed by hand:
+two pieces do not and must be installed by hand:
 
 | tool | source |
 | --- | --- |
 | `SISSIz` | <https://github.com/mtw/SISSIz> — build from source; required for the null-model arm |
 | `alifoldz.pl` | the **RNAz source tarball** (`perl/`); absent from the conda package |
-| `refold.pl` | the **ViennaRNA source tarball** (`src/Utils/`); absent from the conda package |
 
-From conda: `RNALalifold`, `RNAalifold`, `RNAfold`, `RNAz`, `esl-reformat`,
-`ps2eps`, `epstopdf`, `magick`. Optional branches additionally use `R-scape`,
-`cmbuild` and `cmcalibrate`.
+From conda: `RNALalifold`, `RNAalifold`, `RNAz`, `esl-reformat`, `ps2eps`,
+`epstopdf`, `magick`. Optional branches additionally use `R-scape`, `cmbuild`
+and `cmcalibrate`.
+
+Refolding needs the **ViennaRNA Python module** (`import RNA`) in the same
+environment, not a binary: it replaced `refold.pl` and the `RNAfold -C` that
+script fed. `RNAcs --check-deps` verifies it, and warns if the module and the
+`RNAalifold` binary are different ViennaRNA builds — one run must not mix two
+sets of energy parameters.
 
 Check what is resolvable on the current machine:
 

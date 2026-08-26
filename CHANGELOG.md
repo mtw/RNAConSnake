@@ -36,12 +36,12 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   only the ViennaRNA Python bindings: no Perl, and no `RNAfold` subprocess,
   since the constrained fold runs in-process. Verified byte-identical to
   `refold.pl | RNAfold --noPS -C` over 38 windows from two flavivirus
-  alignments, in both constraint modes. Not wired into the workflow yet.
+  alignments, in both constraint modes.
 - **Reproducibility artefacts:** `results/versions.yaml`, `CITATION.cff`,
   `environment.yaml`, a `profiles/test/` CI profile, and a
   [container](container/README.md) pinning the whole toolchain — including
-  SISSIz (<https://github.com/mtw/SISSIz>), `alifoldz.pl` and `refold.pl`, none
-  of which are on any package index.
+  SISSIz (<https://github.com/mtw/SISSIz>) and `alifoldz.pl`, neither of which
+  is on any package index.
 - Input format detection for the initial `RNALalifold` run: `.stk` uses `-f S`,
   `.aln` uses `-f C`.
 
@@ -92,6 +92,13 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   rest of the run -- `results/versions.yaml` among it.
 
 ### Changed
+- **`refold.pl` and the `RNAfold` binary are no longer dependencies.** The
+  refold leg runs `rnaconsnake.tools.refold`, so neither has to be found on
+  `PATH`, vendored into the container, or copied out of the ViennaRNA source
+  tarball. It needs the ViennaRNA **Python module** instead: `RNAcs
+  --check-deps` requires it, warns when it and the `RNAalifold` binary are
+  different builds, and `results/versions.yaml` records its version alongside
+  the binaries'.
 - **The command-line tool is now `RNAcs`.** `rnaconsnake-run` remains a
   deprecated alias.
 - **Default behaviour changed in three places**, each altering results relative

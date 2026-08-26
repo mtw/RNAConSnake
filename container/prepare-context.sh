@@ -11,16 +11,14 @@ V="$HERE/vendor"
 
 SISSIZ_SRC="${SISSIZ_SRC:-$HOME/C/SISSIz}"
 ALIFOLDZ="${ALIFOLDZ:-$HOME/.local/share/RNAz/perl/alifoldz.pl}"
-REFOLD="${REFOLD:-$HOME/.local/share/ViennaRNA/bin/refold.pl}"
 
 rm -rf "$V" && mkdir -p "$V/perl"
 
-for f in "$ALIFOLDZ" "$REFOLD"; do
+for f in "$ALIFOLDZ"; do
   [ -f "$f" ] || {
     echo "missing: $f" >&2
     echo "  alifoldz.pl ships in the RNAz source tarball (perl/)" >&2
-    echo "  refold.pl ships in the ViennaRNA source tarball (src/Utils/)" >&2
-    echo "  neither is in the corresponding conda package" >&2
+    echo "  it is not in the conda package" >&2
     exit 1
   }
   cp "$f" "$V/perl/"

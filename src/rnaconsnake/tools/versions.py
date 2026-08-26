@@ -15,6 +15,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # (config tool key, default command, argv used to ask for a version).
@@ -23,7 +24,6 @@ from pathlib import Path
 VERSION_PROBES: list[tuple[str, str, list[str]]] = [
     ("rnalalifold", "RNALalifold", ["--version"]),
     ("rnaalifold", "RNAalifold", ["--version"]),
-    ("rnafold", "RNAfold", ["--version"]),
     ("rnaz", "RNAz", ["--version"]),
     ("alifoldz", "alifoldz.pl", ["--version"]),
     ("sissiz", "SISSIz", ["--version"]),
@@ -32,7 +32,6 @@ VERSION_PROBES: list[tuple[str, str, list[str]]] = [
     ("rscape", "R-scape", ["-h"]),
     ("cmbuild", "cmbuild", ["-h"]),
     ("cmcalibrate", "cmcalibrate", ["-h"]),
-    ("refold", "refold.pl", ["--version"]),
     ("ps2eps", "ps2eps", ["--version"]),
     ("epstopdf", "epstopdf", ["--version"]),
     ("magick", "magick", ["--version"]),
@@ -65,14 +64,19 @@ def probe(command: str, version_args: list[str], timeout: float = 20.0) -> dict[
     if resolved is None:
         return {"command": command, "path": "MISSING", "version": "unknown"}
     try:
-        result = subprocess.run(
-            [*tokens, *version_args],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout,
-        )
+        # A scratch directory, because several of these tools write side
+        # outputs into wherever they were run -- and this runs in the run
+        # directory.
+        with tempfile.TemporaryDirectory() as scratch:
+            result = subprocess.run(
+                [*tokens, *version_args],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout,
+                cwd=scratch,
+            )
         output = _first_informative_line((result.stdout or "") + "\n" + (result.stderr or ""))
     except (OSError, subprocess.SubprocessError):
         output = ""
@@ -90,6 +94,24 @@ def python_package_version(name: str) -> str:
         return "unknown"
 
 
+def viennarna_bindings() -> dict[str, str]:
+    """The ViennaRNA Python module, which refolding uses instead of ``RNAfold``.
+
+    Recorded next to the binaries because the two are separate installs: a run
+    whose consensus comes from one ViennaRNA build and whose refold comes from
+    another is not reproducible from this file alone.
+    """
+    try:
+        import RNA
+    except ImportError:
+        return {"module": "RNA", "path": "MISSING", "version": "unknown"}
+    return {
+        "module": "RNA",
+        "path": getattr(RNA, "__file__", "unknown"),
+        "version": str(getattr(RNA, "__version__", "unknown")),
+    }
+
+
 def collect(tools: dict[str, str] | None = None) -> dict[str, object]:
     configured = dict(tools or {})
     external: dict[str, dict[str, str]] = {}
@@ -100,6 +122,7 @@ def collect(tools: dict[str, str] | None = None) -> dict[str, object]:
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "snakemake": python_package_version("snakemake"),
+        "viennarna_bindings": viennarna_bindings(),
         "external_tools": external,
     }
 

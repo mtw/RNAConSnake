@@ -34,7 +34,7 @@ The two key preprocessing parameters are:
 
 Each cleaned candidate alignment is reformatted to Clustal and analyzed with `RNAz` and `alifoldz` to estimate structural conservation and thermodynamic support. In parallel, each candidate is passed to `RNAalifold` to compute a consensus secondary structure and associated alignment/structure plots. The workflow normalizes `RNAalifold` outputs across ViennaRNA versions, converts alignment PostScript plots to EPS and PDF, and retains the per-candidate Stockholm result produced by `RNAalifold`.
 
-The `RNAalifold` result is subsequently reformatted and cleaned for constrained refolding. `refold.pl` and `RNAfold` are then used to derive a representative refolded sequence and structure under the consensus constraints. In addition, covariation support is quantified from the `RNAalifold` alignment output using a Python reimplementation of the legacy `alifold-maxcovar.pl` logic, which reports the maximum covariation score and the corresponding count summary for each candidate.
+The `RNAalifold` result is subsequently reformatted and cleaned for constrained refolding. A packaged Python tool (`rnaconsnake.tools.refold`) then derives, for every sequence, its own constraint from the consensus structure and folds it under that constraint through the ViennaRNA Python bindings. It replaces the `refold.pl | RNAfold -C` pipe the legacy workflow used, and reproduces it byte-for-byte. In addition, covariation support is quantified from the `RNAalifold` alignment output using a Python reimplementation of the legacy `alifold-maxcovar.pl` logic, which reports the maximum covariation score and the corresponding count summary for each candidate.
 
 ## De-replication Of Overlapping Windows
 

@@ -13,9 +13,10 @@ pip install -e .[dev]
 
 This project packages the Python-side workflow logic, but still expects the external RNA analysis toolchain to be installed separately and available on `PATH`.
 
-Three of those tools are on no package index and must be built or copied by
-hand: **SISSIz** (<https://github.com/mtw/SISSIz>), **`alifoldz.pl`** (RNAz
-source tarball) and **`refold.pl`** (ViennaRNA source tarball). The
+Two of those tools are on no package index and must be built or copied by
+hand: **SISSIz** (<https://github.com/mtw/SISSIz>) and **`alifoldz.pl`** (RNAz
+source tarball). Refolding additionally needs the ViennaRNA **Python module**
+(`import RNA`) in the same environment. The
 [container](../container/README.md) packages all of them and is the least
 painful way to get a complete environment:
 
@@ -172,12 +173,12 @@ writes the stream `refold.pl` produced, for piping into `RNAfold -C`; the
 default folds in-process through the ViennaRNA Python bindings and writes what
 `RNAfold --noPS -C` would have written.
 
-It is **not wired into the workflow**, which still runs `refold.pl | RNAfold`.
-Output was checked byte-for-byte against that pipe over 38 candidate windows
-from two flavivirus alignments, in both constraint modes. The module needs the
-`RNA` Python module only when it folds; the constraint logic imports nothing.
-Where the two differ, `refold.pl` fails rather than disagreeing — see the
-module docstring.
+`rule run_refold_file` runs this instead of `refold.pl | RNAfold --noPS -C`,
+which is why neither is a dependency any more. Output was checked
+byte-for-byte against that pipe over 38 candidate windows from two flavivirus
+alignments, in both constraint modes. Where the two differ, `refold.pl` fails
+rather than disagreeing — see the module docstring. The `RNA` module is
+imported only when folding; the constraint logic imports nothing.
 
 ## Shipping Model
 
