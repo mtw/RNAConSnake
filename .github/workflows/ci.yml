@@ -37,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # The floor declared in pyproject, the versions in between, and the one
+        # The floor declared in pyproject, the version in between, and the one
         # development happens on. A floor nothing builds against is a guess.
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4

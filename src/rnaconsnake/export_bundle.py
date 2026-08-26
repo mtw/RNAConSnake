@@ -5,7 +5,7 @@ import csv
 import re
 import shutil
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rnaconsnake import __version__
@@ -355,7 +355,7 @@ def build_export(args: argparse.Namespace) -> Path:
     dataset_id = sanitize_id(args.dataset_id or run_dir.name)
     dataset_label = args.dataset_label or run_dir.name
     source_label = args.source_label or (Path(args.input_alignment).name if args.input_alignment else "")
-    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     feature_summary_rel = f"feature_summaries/{feature_id}.md"
     methods_rel = "methods.md"

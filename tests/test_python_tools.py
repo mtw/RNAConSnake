@@ -3427,6 +3427,34 @@ def test_no_rendering_code_or_dependency_is_tracked() -> None:
     assert not offenders, "presentation-layer code leaked into RNAConSnake:\n" + "\n".join(offenders)
 
 
+def test_the_declared_python_floor_is_one_the_dependencies_support() -> None:
+    """A floor below what snakemake supports is a promise nothing can keep:
+    `pip install` fails outright on such an interpreter, and CI would test a
+    version the package can never run on."""
+    import re as _re
+    from importlib.metadata import metadata
+
+    def floor(spec: str) -> tuple[int, ...]:
+        match = _re.search(r">=\s*(\d+)\.(\d+)", spec or "")
+        assert match, f"no lower bound in {spec!r}"
+        return (int(match.group(1)), int(match.group(2)))
+
+    declared = floor(
+        _re.search(r'requires-python\s*=\s*"([^"]+)"', read_text(Path("pyproject.toml"))).group(1)
+    )
+    required = floor(metadata("snakemake").get("Requires-Python", ""))
+    assert declared >= required, (
+        f"pyproject claims Python {declared[0]}.{declared[1]}, but snakemake needs "
+        f"{required[0]}.{required[1]}"
+    )
+
+    # ...and CI must not test below it either.
+    workflow = read_text(Path(".github/workflows/ci.yml"))
+    versions = _re.search(r"python-version: \[([^\]]+)\]", workflow).group(1)
+    tested = [tuple(int(part) for part in v.strip().strip('"').split(".")) for v in versions.split(",")]
+    assert min(tested) >= declared, f"CI tests {min(tested)}, below the declared floor {declared}"
+
+
 def test_packaging_declares_no_web_dependencies() -> None:
     text = read_text(Path("pyproject.toml")).lower()
     for forbidden in ["jinja", "flask", "fastapi", "markdown", "starlette"]:

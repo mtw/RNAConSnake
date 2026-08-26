@@ -44,6 +44,9 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   is on any package index.
 - Input format detection for the initial `RNALalifold` run: `.stk` uses `-f S`,
   `.aln` uses `-f C`.
+- The minimum Python is now **3.11**. `>=3.10` was never installable: snakemake 8
+  requires 3.11, so `pip install` failed outright on 3.10. A test now checks the
+  declared floor against what the dependencies actually support.
 
 ### Fixed
 - **Lower-case alignments hung the workflow indefinitely.** `refold.pl` matches

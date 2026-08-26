@@ -14,7 +14,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python >=3.10
+  - python >=3.11          # snakemake 8 needs it
   - pip
   - snakemake >=8,<10
   # Refolding runs through the ViennaRNA Python module, not RNAfold, so
