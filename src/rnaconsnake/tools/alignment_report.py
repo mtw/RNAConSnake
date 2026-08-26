@@ -15,7 +15,6 @@ This report makes that explicit, so "no candidates here" can be told apart from
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -27,7 +26,6 @@ from rnaconsnake.tools.alignment_io import (
     read_stockholm_alignment,
 )
 from rnaconsnake.workflow_helpers import write_json
-
 
 # Below this fraction of sequences carrying a residue, a column contributes
 # little but noise to the consensus fold.
@@ -52,11 +50,7 @@ class RegionReport:
 def column_occupancy(alignment: Alignment, index: int) -> float:
     if not alignment.n_seq:
         return 0.0
-    residues = sum(
-        1
-        for name in alignment.order
-        if alignment.seqs[name][index] not in GAP_CHARACTERS
-    )
+    residues = sum(1 for name in alignment.order if alignment.seqs[name][index] not in GAP_CHARACTERS)
     return residues / alignment.n_seq
 
 
@@ -67,7 +61,7 @@ def window_identity(alignment: Alignment, start: int, end: int) -> float:
     for left, right in combinations(alignment.order, 2):
         a = alignment.seqs[left][start:end]
         b = alignment.seqs[right][start:end]
-        for x, y in zip(a, b):
+        for x, y in zip(a, b, strict=True):
             if x in GAP_CHARACTERS and y in GAP_CHARACTERS:
                 continue
             totals += 1
@@ -177,9 +171,7 @@ def render_text(payload: dict) -> str:
     ]
     for warning in payload["warnings"]:
         lines.append(f"# WARNING\t{warning}")
-    lines.append(
-        "start\tend\toccupancy\tmean_pairwise_identity\tscreenable\treduced_power\treasons"
-    )
+    lines.append("start\tend\toccupancy\tmean_pairwise_identity\tscreenable\treduced_power\treasons")
     for region in payload["regions"]:
         lines.append(
             "\t".join(
@@ -219,9 +211,7 @@ def main() -> int:
     args = parser.parse_args()
 
     alignment = load_alignment(args.alignment)
-    payload = summarize(
-        profile(alignment, args.window, args.min_occupancy, args.min_identity), alignment
-    )
+    payload = summarize(profile(alignment, args.window, args.min_occupancy, args.min_identity), alignment)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(render_text(payload), encoding="utf-8")
     if args.metadata:

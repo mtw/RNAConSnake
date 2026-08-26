@@ -18,7 +18,6 @@ from pathlib import Path
 
 from rnaconsnake.tools.stockholm_utils import StockholmRecord, parse_stockholm_records
 
-
 GAP_CHARACTERS = frozenset("-.~_")
 CONSERVATION_CHARACTERS = frozenset("*:. ")
 
@@ -98,9 +97,7 @@ def read_stockholm_alignment(path: str | Path) -> Alignment:
     if not records:
         raise ValueError(f"No Stockholm records found in {path}")
     if len(records) > 1:
-        raise ValueError(
-            f"Expected a single alignment in {path}, found {len(records)} Stockholm records"
-        )
+        raise ValueError(f"Expected a single alignment in {path}, found {len(records)} Stockholm records")
     return alignment_from_stockholm_record(records[0])
 
 
@@ -136,7 +133,7 @@ def mean_pairwise_identity(alignment: Alignment) -> float:
     matches = 0
     for left, right in combinations(alignment.order, 2):
         a, b = alignment.seqs[left], alignment.seqs[right]
-        for char_a, char_b in zip(a, b):
+        for char_a, char_b in zip(a, b, strict=True):
             if char_a in GAP_CHARACTERS and char_b in GAP_CHARACTERS:
                 continue
             totals += 1
@@ -178,12 +175,7 @@ def gap_fraction(alignment: Alignment) -> float:
     total = alignment.length * alignment.n_seq
     if not total:
         return 0.0
-    gaps = sum(
-        1
-        for name in alignment.order
-        for char in alignment.seqs[name]
-        if char in GAP_CHARACTERS
-    )
+    gaps = sum(1 for name in alignment.order for char in alignment.seqs[name] if char in GAP_CHARACTERS)
     return round(gaps / total, 6)
 
 

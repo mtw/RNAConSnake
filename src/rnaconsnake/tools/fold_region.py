@@ -27,9 +27,7 @@ from rnaconsnake.workflow_helpers import normalize_rnaalifold_side_output, run_c
 def slice_alignment(alignment: Alignment, start: int, end: int) -> Alignment:
     """1-based inclusive column slice."""
     if start < 1 or end > alignment.length or start > end:
-        raise ValueError(
-            f"span {start}-{end} is outside the alignment (1-{alignment.length})"
-        )
+        raise ValueError(f"span {start}-{end} is outside the alignment (1-{alignment.length})")
     lo, hi = start - 1, end
     return Alignment(
         order=list(alignment.order),
@@ -50,14 +48,24 @@ def preprocess(source: Path, workdir: Path, label: str, gapratio: float, max_n: 
     """The workflow's own cleanup: drop gap-dominated and redundant sequences."""
     remgap = workdir / f"{label}.remgap.stk"
     run_checked(
-        ["python3", "-m", "rnaconsnake.tools.remove_gaponly", "-a", str(source),
-         "-i", "stockholm", "-r", str(gapratio), "-n", str(max_n)],
+        [
+            "python3",
+            "-m",
+            "rnaconsnake.tools.remove_gaponly",
+            "-a",
+            str(source),
+            "-i",
+            "stockholm",
+            "-r",
+            str(gapratio),
+            "-n",
+            str(max_n),
+        ],
         stdout_path=remgap,
     )
     cleaned = workdir / f"{label}.stk"
     run_checked(
-        ["python3", "-m", "rnaconsnake.tools.strip_aln", "-a", str(remgap),
-         "-f", "S", "--nosingle"],
+        ["python3", "-m", "rnaconsnake.tools.strip_aln", "-a", str(remgap), "-f", "S", "--nosingle"],
         stdout_path=cleaned,
     )
     return cleaned
@@ -67,8 +75,23 @@ def fold_and_plot(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]
     """RNAalifold with the workflow's parameters, then EPS and PDF."""
     run_checked(
         shlex.split(tools["rnaalifold"])
-        + ["-t4", "--aln", "--color", "-r", "--cfactor", "0.6", "--nfactor", "0.5",
-           "-p", "--aln-EPS-cols=200", "--aln-stk", "-f", "S", "--id-prefix", label],
+        + [
+            "-t4",
+            "--aln",
+            "--color",
+            "-r",
+            "--cfactor",
+            "0.6",
+            "--nfactor",
+            "0.5",
+            "-p",
+            "--aln-EPS-cols=200",
+            "--aln-stk",
+            "-f",
+            "S",
+            "--id-prefix",
+            label,
+        ],
         stdin_path=cleaned,
         stdout_path=outdir / f"{label}.alifold.out",
         cwd=str(outdir),
@@ -97,15 +120,26 @@ def score(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]) -> dic
     run_checked(shlex.split(tools["rnaz"]) + ["-d", "-n", str(clustal)], stdout_path=rnaz_txt)
     rnaz_json = outdir / f"{label}.rnaz.json"
     run_checked(
-        ["python3", "-m", "rnaconsnake.tools.legacy_postprocess", "extract-rnaz",
-         "--input", str(rnaz_txt), "--output", str(rnaz_json)]
+        [
+            "python3",
+            "-m",
+            "rnaconsnake.tools.legacy_postprocess",
+            "extract-rnaz",
+            "--input",
+            str(rnaz_txt),
+            "--output",
+            str(rnaz_json),
+        ]
     )
     scores = json.loads(rnaz_json.read_text(encoding="utf-8"))
 
     with open(clustal, encoding="utf-8") as handle:
         result = subprocess.run(
             shlex.split(tools["alifoldz"]) + ["-f", "-t", "0.0"],
-            stdin=handle, capture_output=True, text=True, check=False,
+            stdin=handle,
+            capture_output=True,
+            text=True,
+            check=False,
         )
     lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
     value = lines[-1] if lines else ""
@@ -134,8 +168,12 @@ def main() -> int:
     outdir = Path(args.output_dir)
     outdir.mkdir(parents=True, exist_ok=True)
     tools = {
-        "rnaalifold": args.rnaalifold, "rnaz": args.rnaz, "alifoldz": args.alifoldz,
-        "eslreformat": args.eslreformat, "ps2eps": args.ps2eps, "epstopdf": args.epstopdf,
+        "rnaalifold": args.rnaalifold,
+        "rnaz": args.rnaz,
+        "alifoldz": args.alifoldz,
+        "eslreformat": args.eslreformat,
+        "ps2eps": args.ps2eps,
+        "epstopdf": args.epstopdf,
     }
 
     alignment = read_stockholm_alignment(args.alignment)
@@ -145,8 +183,13 @@ def main() -> int:
     cleaned = preprocess(raw, outdir, args.label, args.remove_gaponly_gapratio, args.remove_gaponly_max_n)
     fold_and_plot(cleaned, outdir, args.label, tools)
 
-    payload = {"label": args.label, "start": args.start, "end": args.end,
-               "columns": args.end - args.start + 1, "n_seq_after_cleanup": read_stockholm_alignment(cleaned).n_seq}
+    payload = {
+        "label": args.label,
+        "start": args.start,
+        "end": args.end,
+        "columns": args.end - args.start + 1,
+        "n_seq_after_cleanup": read_stockholm_alignment(cleaned).n_seq,
+    }
     if not args.no_scores:
         payload.update(score(cleaned, outdir, args.label, tools))
     (outdir / f"{args.label}.scores.json").write_text(

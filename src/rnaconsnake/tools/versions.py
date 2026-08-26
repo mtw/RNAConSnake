@@ -17,7 +17,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 # (config tool key, default command, argv used to ask for a version).
 # Several of these tools print their version to stderr and/or exit non-zero;
 # both are tolerated and the first non-empty output line is kept.
@@ -50,9 +49,7 @@ def _first_informative_line(text: str) -> str:
     line, so taking line one alone would report a description instead.
     """
     informative = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip() and not line.strip().startswith("Usage")
+        line.strip() for line in text.splitlines() if line.strip() and not line.strip().startswith("Usage")
     ]
     for line in informative[:5]:
         if VERSION_PATTERN.search(line):

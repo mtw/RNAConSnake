@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import csv
 import itertools
-import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,9 +41,7 @@ class Subset:
 
 
 def subset_identity(alignment: Alignment, names: tuple[str, ...]) -> float:
-    return mean_pairwise_identity(
-        Alignment(order=list(names), seqs={n: alignment.seqs[n] for n in names})
-    )
+    return mean_pairwise_identity(Alignment(order=list(names), seqs={n: alignment.seqs[n] for n in names}))
 
 
 def enumerate_subsets(
@@ -135,7 +132,8 @@ def main() -> int:
     parser.add_argument("--manifest", required=True, help="TSV describing the subsets.")
     parser.add_argument("--sizes", default="", help="Comma-separated subset sizes. Default: 2..n.")
     parser.add_argument(
-        "--identities", default="0.4,0.5,0.6,0.7,0.8,0.9",
+        "--identities",
+        default="0.4,0.5,0.6,0.7,0.8,0.9",
         help="Target mean pairwise identities to sample toward.",
     )
     parser.add_argument("--max-subsets", type=int, default=200)
@@ -159,18 +157,21 @@ def main() -> int:
     Path(args.manifest).parent.mkdir(parents=True, exist_ok=True)
     with open(args.manifest, "w", encoding="utf-8", newline="") as handle:
         handle.write(f"# sensitivity envelope subsets of {args.alignment}\n")
-        handle.write(f"# source: {alignment.n_seq} sequences, "
-                     f"MPI {mean_pairwise_identity(alignment):.4f}\n")
+        handle.write(f"# source: {alignment.n_seq} sequences, MPI {mean_pairwise_identity(alignment):.4f}\n")
         writer = csv.DictWriter(
-            handle, fieldnames=["label", "n_seq", "identity", "names"],
-            delimiter="\t", lineterminator="\n",
+            handle,
+            fieldnames=["label", "n_seq", "identity", "names"],
+            delimiter="\t",
+            lineterminator="\n",
         )
         writer.writeheader()
         for row in rows:
             writer.writerow({k: row[k] for k in ["label", "n_seq", "identity", "names"]})
-    print(f"{len(rows)} subsets spanning "
-          f"MPI {min(r['identity'] for r in rows):.2f}-{max(r['identity'] for r in rows):.2f} "
-          f"-> {outdir}")
+    print(
+        f"{len(rows)} subsets spanning "
+        f"MPI {min(r['identity'] for r in rows):.2f}-{max(r['identity'] for r in rows):.2f} "
+        f"-> {outdir}"
+    )
     return 0
 
 

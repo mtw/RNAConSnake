@@ -43,7 +43,6 @@ from pathlib import Path
 from rnaconsnake.tools.loci import WindowCoords, overlap, parse_window_name
 from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, write_json
 
-
 METHODS = ("containment", "substructure", "overlap", "none")
 
 # How a locus picks the member window it is represented by.
@@ -60,7 +59,7 @@ REPRESENTATIVE_RULES = ("best_rnaz", "widest", "best_alifoldz", "widest_of_top_h
 
 OPENING_BRACKETS = "(<[{"
 CLOSING_BRACKETS = ")>]}"
-BRACKET_PARTNER = dict(zip(CLOSING_BRACKETS, OPENING_BRACKETS))
+BRACKET_PARTNER = dict(zip(CLOSING_BRACKETS, OPENING_BRACKETS, strict=True))
 
 NR_EXTRA_COLUMNS = [
     "locus_id",
@@ -156,8 +155,7 @@ def select_representative(members: list[Candidate], rule: str = "best_rnaz") -> 
     is deterministic and identical in every arm."""
     if rule not in REPRESENTATIVE_RULES:
         raise ValueError(
-            f"Unknown representative rule {rule!r}. Expected one of: "
-            + ", ".join(REPRESENTATIVE_RULES)
+            f"Unknown representative rule {rule!r}. Expected one of: " + ", ".join(REPRESENTATIVE_RULES)
         )
     if rule == "widest":
         return max(members, key=lambda m: (m.width, m.rank, m.name))
@@ -205,9 +203,7 @@ class _UnionFind:
             self._parent[right_root] = left_root
 
 
-def _may_absorb(
-    outer: Candidate, inner: Candidate, max_container_width: int, min_coverage: float
-) -> bool:
+def _may_absorb(outer: Candidate, inner: Candidate, max_container_width: int, min_coverage: float) -> bool:
     """May ``outer`` absorb the nested ``inner`` as a fragment of itself?
 
     RNALalifold's long windows can span several genuinely distinct elements: a
@@ -236,11 +232,9 @@ def _linked(
 ) -> bool:
     if method == "containment":
         return (
-            interval_contains(first, second)
-            and _may_absorb(first, second, max_container_width, min_coverage)
+            interval_contains(first, second) and _may_absorb(first, second, max_container_width, min_coverage)
         ) or (
-            interval_contains(second, first)
-            and _may_absorb(second, first, max_container_width, min_coverage)
+            interval_contains(second, first) and _may_absorb(second, first, max_container_width, min_coverage)
         )
     if method == "substructure":
         return (
@@ -263,9 +257,7 @@ def cluster_candidates(
     representative_rule: str = "best_rnaz",
 ) -> list[Cluster]:
     if method not in METHODS:
-        raise ValueError(
-            f"Unknown de-replication method {method!r}. Expected one of: " + ", ".join(METHODS)
-        )
+        raise ValueError(f"Unknown de-replication method {method!r}. Expected one of: " + ", ".join(METHODS))
     ordered = sorted(candidates, key=lambda candidate: (candidate.start, candidate.end, candidate.name))
     if method == "none":
         return [
@@ -298,8 +290,7 @@ def cluster_candidates(
         grouped.setdefault(union.find(index), []).append(candidate)
 
     clusters = [
-        Cluster(locus_id="", members=members, rule=representative_rule)
-        for members in grouped.values()
+        Cluster(locus_id="", members=members, rule=representative_rule) for members in grouped.values()
     ]
     clusters.sort(key=lambda cluster: (cluster.start, cluster.end))
     for index, cluster in enumerate(clusters, start=1):
@@ -347,9 +338,7 @@ def write_non_redundant_csv(clusters: list[Cluster], path: str | Path) -> None:
                     "locus_start": cluster.start,
                     "locus_end": cluster.end,
                     "n_windows": len(cluster.members),
-                    "members": ";".join(
-                        sorted(member.name for member in cluster.members)
-                    ),
+                    "members": ";".join(sorted(member.name for member in cluster.members)),
                 }
             )
             writer.writerow(row)
@@ -385,7 +374,9 @@ def main() -> int:
     )
     parser.add_argument("--label", default="locus")
     parser.add_argument(
-        "--representative", default="best_rnaz", choices=list(REPRESENTATIVE_RULES),
+        "--representative",
+        default="best_rnaz",
+        choices=list(REPRESENTATIVE_RULES),
         help="How each locus picks the window that represents it.",
     )
     parser.add_argument(

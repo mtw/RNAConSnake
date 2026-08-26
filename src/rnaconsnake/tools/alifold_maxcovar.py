@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def compute(lines: Iterable[str]) -> tuple[int, str]:
     maxcovar = 0
     gapali = 0
-    cov = {i: 0 for i in range(7)}
+    cov = dict.fromkeys(range(7), 0)
 
     for raw_line in lines:
         line = raw_line.rstrip("\n")

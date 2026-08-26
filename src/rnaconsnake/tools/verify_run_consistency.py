@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from rnaconsnake.workflow_helpers import read_manifest
 
@@ -58,12 +58,10 @@ def build_snapshot(run_dir: Path, wlen: int) -> CandidateSnapshot:
     stk_manifest = read_manifest(stk_manifest_path)
 
     split_hashes = {
-        name: sha256_file(run_dir / "Lalifold" / len_dir / "split" / name)
-        for name in split_manifest
+        name: sha256_file(run_dir / "Lalifold" / len_dir / "split" / name) for name in split_manifest
     }
     stk_hashes = {
-        name: sha256_file(run_dir / "generated_files" / "stk" / len_dir / name)
-        for name in stk_manifest
+        name: sha256_file(run_dir / "generated_files" / "stk" / len_dir / name) for name in stk_manifest
     }
 
     return CandidateSnapshot(
@@ -121,7 +119,9 @@ def comparison_payload(left_run: Path, right_run: Path, window_lengths: Iterable
     }
     differences: list[str] = []
     for wlen in window_lengths:
-        differences.extend(compare_snapshots(build_snapshot(left_run, wlen), build_snapshot(right_run, wlen), wlen))
+        differences.extend(
+            compare_snapshots(build_snapshot(left_run, wlen), build_snapshot(right_run, wlen), wlen)
+        )
     payload["differences"] = differences
     payload["identical"] = not differences
     return payload
@@ -186,7 +186,10 @@ def main() -> int:
         if payload["identical"]:
             print("Deterministic candidate-generation outputs are identical.")
             print(f"Compared window lengths: {', '.join(str(wlen) for wlen in window_lengths)}")
-            print("Compared artifacts: RNALalifold multi-record outputs, split candidate manifests/files, cleaned alignment manifests/files.")
+            print(
+                "Compared artifacts: RNALalifold multi-record outputs, split candidate "
+                "manifests/files, cleaned alignment manifests/files."
+            )
         else:
             for message in payload["differences"]:
                 print(message)

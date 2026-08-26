@@ -13,7 +13,6 @@ from rnaconsnake.tools.stockholm_utils import (
     subset_record,
 )
 
-
 FORMAT_MAP = {
     "C": "clustalw",
     "S": "stockholm",
@@ -44,7 +43,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Remove redundant sequences from alignments.")
     parser.add_argument("-a", "--aln", required=True, help="Input alignment")
     parser.add_argument("-f", "--format", required=True, help="Alignment format code")
-    parser.add_argument("--nosingle", action="store_true", help="Keep all sequences if only one unique sequence remains")
+    parser.add_argument(
+        "--nosingle", action="store_true", help="Keep all sequences if only one unique sequence remains"
+    )
     parser.add_argument("--version", action="store_true", help="Show version and exit")
     return parser.parse_args()
 

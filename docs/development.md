@@ -54,10 +54,15 @@ Important preprocessing knobs in [`config.yaml`](../config.yaml):
 
 ```bash
 pytest -v
+ruff check .
+ruff format .
 RNAcs --input-alignment /path/to/input.stk --output-dir /path/to/run_dir
 RNAcs --check-deps
 RNAcs --version
 ```
+
+Lint and formatting are enforced in CI (`ruff check .`, `ruff format --check .`),
+configured in `pyproject.toml` under `[tool.ruff]`.
 
 Example CLI override for window sizes:
 

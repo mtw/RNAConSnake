@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 # RNALalifold candidate basenames look like ``RC_150_0001_aln_2294_2375``:
 # prefix, window length, block index, then the alignment coordinates.
 WINDOW_NAME = re.compile(r"^(?P<prefix>.+)_aln_(?P<start>\d+)_(?P<end>\d+)$")

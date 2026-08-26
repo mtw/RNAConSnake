@@ -94,6 +94,11 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   defaults to 120; `strip_aln` upper-cases sequences. The cascade thresholds and
   representative rule are recorded in
   [`docs/configuration_lock.md`](docs/configuration_lock.md).
+- **Ruff is now the linter and formatter**, enforced in CI (`ruff check`,
+  `ruff format --check`) and configured in `pyproject.toml` at 110 columns. The
+  tree was formatted in one pass; the lint fixes it required were unused
+  imports, import order, `zip(..., strict=)` on alignment rows, and a file
+  handle left unclosed in the tests.
 - Internal cleanups: `SUMMARY_FIELDS` defined once and shared; `run_checked`
   uses `contextlib.ExitStack`; `normalize_rnaalifold_side_output` raises rather
   than silently no-oping; manifest rules share a helper; `refold_firstseq` and

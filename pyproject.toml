@@ -20,6 +20,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8,<9",
+  # Pinned to a minor series: the formatter's output can change between them,
+  # and CI checks formatting.
+  "ruff>=0.16,<0.17",
 ]
 
 [project.scripts]
@@ -42,6 +45,29 @@ rnaconsnake = [
   "workflow/snakefile",
   "workflow/config.yaml",
   "resources/benchmark/*",
+]
+
+[tool.ruff]
+# The codebase is written to ~110 columns; 88 would reflow prose-heavy
+# docstrings and comments that read better as they are. Python version comes
+# from project.requires-python.
+line-length = 110
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # import order
+  "UP",   # pyupgrade
+  "B",    # bugbear
+  "C4",   # comprehensions
+  "SIM",  # simplifications
+]
+ignore = [
+  # Both sites it flags here fold a multi-line if/else into a ~110-column
+  # ternary, which is shorter but not clearer.
+  "SIM108",
 ]
 
 [tool.pytest.ini_options]

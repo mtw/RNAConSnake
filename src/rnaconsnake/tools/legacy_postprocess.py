@@ -105,11 +105,7 @@ def cmd_clean_clustal(args: argparse.Namespace) -> int:
     source = Path(args.input).read_text(encoding="utf-8")
     Path(args.backup).write_text(source, encoding="utf-8")
 
-    cleaned_lines = [
-        _uppercase_clustal_sequences(line)
-        for line in source.splitlines()
-        if "*" not in line
-    ]
+    cleaned_lines = [_uppercase_clustal_sequences(line) for line in source.splitlines() if "*" not in line]
     cleaned = "\n".join(cleaned_lines).rstrip() + "\n"
     Path(args.output).write_text(cleaned, encoding="utf-8")
     return 0
@@ -200,9 +196,9 @@ def cmd_render_reports(args: argparse.Namespace) -> int:
     with open(args.log, "w", encoding="utf-8") as log_handle:
         for record in records:
             log_handle.write(
-                "X {wbn} {nrseq} {alilen} maxcovar {maxcovarval} {maxcovarcount} rscape {rscape_covary_count} {rnazprob} {sci} {consensus_mfe} {alifoldzscore} {alifold_consstruc}\n".format(
-                    **record
-                )
+                "X {wbn} {nrseq} {alilen} maxcovar {maxcovarval} {maxcovarcount} rscape "
+                "{rscape_covary_count} {rnazprob} {sci} {consensus_mfe} {alifoldzscore} "
+                "{alifold_consstruc}\n".format(**record)
             )
 
     with open(args.csv, "w", encoding="utf-8", newline="") as csv_handle:
@@ -284,8 +280,7 @@ def cmd_render_markdown(args: argparse.Namespace) -> int:
         "",
         "## All windows",
         "",
-        f"Every RNALalifold window, including the {max(len(full_rows) - len(nr_rows), 0)} "
-        "collapsed above.",
+        f"Every RNALalifold window, including the {max(len(full_rows) - len(nr_rows), 0)} collapsed above.",
         "",
     ]
     lines += _markdown_table(SUMMARY_FIELDS, full_rows)

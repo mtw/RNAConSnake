@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import shlex
 import shutil
 import subprocess
@@ -51,7 +50,6 @@ from rnaconsnake.workflow_helpers import (
     perl_seeded_command,
     write_json,
 )
-
 
 MPI_DRIFT_WARNING = 0.05
 
@@ -95,9 +93,7 @@ def _perl_seeded_command(tokens: list[str], seed: int, args: list[str]) -> tuple
     try:
         return perl_seeded_command(tokens, seed, args)
     except ValueError as error:
-        raise NullModelError(
-            "Empty command configured for the rnazRandomizeAln backend"
-        ) from error
+        raise NullModelError("Empty command configured for the rnazRandomizeAln backend") from error
 
 
 def _perl_env() -> dict[str, str]:
@@ -112,9 +108,7 @@ def _align_names(source: Alignment, replicate: Alignment) -> tuple[Alignment, bo
         raise NullModelError(
             f"Simulated alignment has {len(replicate.order)} sequences, source has {len(source.order)}"
         )
-    remapped = {
-        new: replicate.seqs[old] for new, old in zip(source.order, replicate.order)
-    }
+    remapped = {new: replicate.seqs[old] for new, old in zip(source.order, replicate.order, strict=True)}
     return Alignment(order=list(source.order), seqs=remapped), True
 
 
@@ -141,9 +135,7 @@ def validate_replicate(source: Alignment, replicate: Alignment, method: str) -> 
 
     drift = abs(mean_pairwise_identity(replicate) - mean_pairwise_identity(source))
     if drift > MPI_DRIFT_WARNING:
-        warnings.append(
-            f"mean pairwise identity drifted by {drift:.3f} (> {MPI_DRIFT_WARNING})"
-        )
+        warnings.append(f"mean pairwise identity drifted by {drift:.3f} (> {MPI_DRIFT_WARNING})")
     return warnings
 
 
@@ -163,9 +155,7 @@ def _simulate_sissiz(
     (workdir / "sissiz.out").write_text(stdout, encoding="utf-8")
     blocks = parse_clustal_blocks(stdout)
     if len(blocks) < replicates:
-        raise NullModelError(
-            f"SISSIz returned {len(blocks)} simulated alignments, expected {replicates}"
-        )
+        raise NullModelError(f"SISSIz returned {len(blocks)} simulated alignments, expected {replicates}")
     # SISSIz exposes no seed option and draws its own from the clock (two runs
     # inside the same second agree; a second apart they do not). The arm seed
     # therefore cannot reproduce a SISSIz pool -- reproducibility comes from
@@ -198,9 +188,7 @@ def _simulate_randomize(
         stdout = _run(cmd, env=_perl_env())
         parsed = parse_clustal_blocks(stdout)
         if not parsed:
-            raise NullModelError(
-                f"rnazRandomizeAln produced no alignment for replicate {index}"
-            )
+            raise NullModelError(f"rnazRandomizeAln produced no alignment for replicate {index}")
         blocks.append(parsed[0])
     return blocks, {
         "determinism": "seeded" if seeded_all else "unseeded",
@@ -226,9 +214,7 @@ def simulate_pool(
 
     source = read_stockholm_alignment(source_path)
     if source.n_seq < 2:
-        raise NullModelError(
-            f"Null simulation needs at least 2 sequences, source has {source.n_seq}"
-        )
+        raise NullModelError(f"Null simulation needs at least 2 sequences, source has {source.n_seq}")
 
     with tempfile.TemporaryDirectory() as tmp:
         scratch = Path(workdir) if workdir else Path(tmp)
@@ -236,9 +222,7 @@ def simulate_pool(
         if method == "sissiz":
             blocks, backend_meta = _simulate_sissiz(source, replicates, sissiz_command, scratch)
         elif method == "rnazRandomizeAln":
-            blocks, backend_meta = _simulate_randomize(
-                source, replicates, randomize_command, scratch, seed
-            )
+            blocks, backend_meta = _simulate_randomize(source, replicates, randomize_command, scratch, seed)
         else:
             raise NullModelError(f"Unsupported null.method for simulation: {method!r}")
 
@@ -307,9 +291,7 @@ def adopt_pool(
     source = read_stockholm_alignment(source_path)
     records = parse_stockholm_records(pool_path)
     if len(records) < replicates:
-        raise NullModelError(
-            f"Pinned pool {pool_path} holds {len(records)} replicates, need {replicates}"
-        )
+        raise NullModelError(f"Pinned pool {pool_path} holds {len(records)} replicates, need {replicates}")
 
     warnings: list[str] = []
     diagnostics: list[dict[str, object]] = []
@@ -375,14 +357,10 @@ def make_arm_alignment(
 
     records = parse_stockholm_records(pool_path)
     wanted = [
-        record
-        for record in records
-        if any(line.strip() == f"#=GF ID {arm}" for line in record.gf_lines)
+        record for record in records if any(line.strip() == f"#=GF ID {arm}" for line in record.gf_lines)
     ]
     if len(wanted) != 1:
-        raise NullModelError(
-            f"Expected exactly one record with ID {arm} in {pool_path}, found {len(wanted)}"
-        )
+        raise NullModelError(f"Expected exactly one record with ID {arm} in {pool_path}, found {len(wanted)}")
     record = wanted[0]
     with open(output, "w", encoding="utf-8") as handle:
         handle.write("# STOCKHOLM 1.0\n")

@@ -5,10 +5,10 @@ import hashlib
 import json
 import shlex
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
-
+from typing import Any
 
 SUMMARY_FIELDS = [
     "wbn",
@@ -42,7 +42,7 @@ class WorkflowSettings:
     tools: dict[str, str]
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "WorkflowSettings":
+    def from_config(cls, config: dict[str, Any]) -> WorkflowSettings:
         return cls(
             input_alignment=config.get("input_alignment"),
             maxbpspan=[int(value) for value in config.get("maxbpspan", [100, 200])],
@@ -86,7 +86,7 @@ class NullSettings:
     pool_file: str | None = None
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "NullSettings":
+    def from_config(cls, config: dict[str, Any]) -> NullSettings:
         # An unquoted ``null:`` key in YAML parses as the null scalar, so the
         # section can arrive under ``None`` instead of ``"null"``. Accept both
         # rather than silently ignoring a user's configuration.
@@ -96,9 +96,7 @@ class NullSettings:
         raw = dict(section or {})
         method = str(raw.get("method", "none"))
         if method not in NULL_METHODS:
-            raise ValueError(
-                f"Unknown null.method {method!r}. Expected one of: " + ", ".join(NULL_METHODS)
-            )
+            raise ValueError(f"Unknown null.method {method!r}. Expected one of: " + ", ".join(NULL_METHODS))
         return cls(
             method=method,
             replicates=int(raw.get("replicates", 10)),
@@ -144,7 +142,7 @@ class CalibrationSettings:
     representative_rule: str
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "CalibrationSettings":
+    def from_config(cls, config: dict[str, Any]) -> CalibrationSettings:
         raw = dict(config.get("calibration", {}) or {})
         dereplicate = dict(config.get("dereplicate", {}) or {})
         return cls(
@@ -201,7 +199,7 @@ def arm_seed(arm: str, base_seed: int) -> int | None:
     """
     if arm == REAL_ARM:
         return None
-    digest = hashlib.sha256(f"{int(base_seed)}:{arm}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{int(base_seed)}:{arm}".encode()).hexdigest()
     return int(digest[:8], 16)
 
 
@@ -250,7 +248,7 @@ def perl_seeded_command(
 
 def derived_seed(base_seed: int, label: str) -> int:
     """Deterministic per-item seed, so parallel jobs differ but reproduce."""
-    digest = hashlib.sha256(f"{int(base_seed)}:{label}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{int(base_seed)}:{label}".encode()).hexdigest()
     return int(digest[:8], 16)
 
 
@@ -455,9 +453,7 @@ def run_checked(
         # otherwise block forever reading the user's terminal, stalling every
         # scheduler slot instead of failing.
         stdin_handle = (
-            stack.enter_context(open(stdin_path, encoding="utf-8"))
-            if stdin_path
-            else subprocess.DEVNULL
+            stack.enter_context(open(stdin_path, encoding="utf-8")) if stdin_path else subprocess.DEVNULL
         )
         stdout_handle = stack.enter_context(open(stdout_path, "w", encoding="utf-8")) if stdout_path else None
         stderr_handle = stack.enter_context(open(stderr_path, "w", encoding="utf-8")) if stderr_path else None

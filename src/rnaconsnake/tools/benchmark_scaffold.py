@@ -29,7 +29,6 @@ from rnaconsnake.tools.dereplicate import base_pairs
 from rnaconsnake.tools.loci import parse_window_name
 from rnaconsnake.tools.stockholm_utils import parse_stockholm_records
 
-
 # Structural elements of the kind this screen targets are on the order of tens
 # of nucleotides. Helices spanning much more than this are long-range pairings
 # that bracket several elements rather than defining one.
@@ -233,9 +232,7 @@ def write_scaffold(rows: list[dict[str, str]], path: str | Path, alignment_id: s
         handle.write("#\n")
         handle.write("# Rows still containing TBD are refused by the benchmark; see\n")
         handle.write("# resources/benchmark/README.md.\n")
-        writer = csv.DictWriter(
-            handle, fieldnames=TRUTH_COLUMNS, delimiter="\t", lineterminator="\n"
-        )
+        writer = csv.DictWriter(handle, fieldnames=TRUTH_COLUMNS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -276,9 +273,7 @@ def main() -> int:
             "These may bracket several elements. Re-run with a smaller --max-width to "
             "decompose them, and fold the sub-spans with rnaconsnake.tools.fold_region."
         )
-    small = [
-        d for d in domains if d.width < 20
-    ]
+    small = [d for d in domains if d.width < 20]
     if small:
         print(
             f"note: {len(small)} domain(s) are under 20 nt "

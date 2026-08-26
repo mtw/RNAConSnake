@@ -29,7 +29,6 @@ from rnaconsnake.tools.calibration import (
 )
 from rnaconsnake.workflow_helpers import REAL_ARM
 
-
 SWEEP_COLUMNS = [
     "rnaz_prob",
     "alifoldz",
@@ -71,15 +70,11 @@ def read_reference_spans(path: str | Path) -> list[tuple[int, int]]:
     return spans
 
 
-def count_recovered(
-    survivors: list[LocusRecord], spans: list[tuple[int, int]], min_fraction: float
-) -> int:
+def count_recovered(survivors: list[LocusRecord], spans: list[tuple[int, int]], min_fraction: float) -> int:
     recovered = 0
     for start, end in spans:
         length = end - start + 1
-        best = max(
-            (_overlap(start, end, locus.start, locus.end) for locus in survivors), default=0
-        )
+        best = max((_overlap(start, end, locus.start, locus.end) for locus in survivors), default=0)
         if length and best / length >= min_fraction:
             recovered += 1
     return recovered
@@ -133,16 +128,13 @@ def sweep(
             )
             real = cascade_survivors(loci_by_arm[REAL_ARM], thresholds, include_rscape)
             null_counts = [
-                len(cascade_survivors(loci_by_arm[arm], thresholds, include_rscape))
-                for arm in null_arms
+                len(cascade_survivors(loci_by_arm[arm], thresholds, include_rscape)) for arm in null_arms
             ]
             null_mean = statistics.fmean(null_counts) if null_counts else 0.0
             null_sd = statistics.pstdev(null_counts) if len(null_counts) > 1 else 0.0
             fdr = min(1.0, null_mean / len(real)) if real else None
             recovered = (
-                count_recovered(real, reference_spans, min_fraction)
-                if reference_spans is not None
-                else None
+                count_recovered(real, reference_spans, min_fraction) if reference_spans is not None else None
             )
             points.append(
                 SweepPoint(

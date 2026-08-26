@@ -16,8 +16,13 @@ pip install -e .[dev]
 ```bash
 source .venv/bin/activate
 pytest -v
+ruff check .          # lint; --fix applies the safe fixes
+ruff format .         # formatting; CI runs --check
 RNAcs --check-deps
 ```
+
+Both ruff commands are enforced in CI. Configuration lives in `pyproject.toml`
+under `[tool.ruff]`; the line length is 110, not ruff's default 88.
 
 If `RNALalifold` is available on `PATH`, you can also run the local workflow:
 

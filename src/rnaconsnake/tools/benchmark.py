@@ -20,7 +20,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 TRUTH_COLUMNS = ["element_id", "element_class", "alignment", "start", "end", "notes"]
 
 RECOVERY_COLUMNS = [
@@ -100,9 +99,7 @@ def read_truth(path: str | Path, alignment: str | None = None) -> list[TruthElem
     reader = csv.DictReader(lines, delimiter="\t")
     missing = [column for column in TRUTH_COLUMNS if column not in (reader.fieldnames or [])]
     if missing:
-        raise BenchmarkError(
-            f"Truth file {path} is missing required columns: {', '.join(missing)}"
-        )
+        raise BenchmarkError(f"Truth file {path} is missing required columns: {', '.join(missing)}")
     for row in reader:
         element_alignment = (row.get("alignment") or "").strip()
         if alignment and element_alignment and element_alignment != alignment:
@@ -166,7 +163,7 @@ def evaluate(
             + ", ".join(placeholders[:10])
             + (" ..." if len(placeholders) > 10 else "")
             + ". This looks like an unedited benchmark_scaffold output: replace every "
-              "TBD element_id and element_class with the real element name and class."
+            "TBD element_id and element_class with the real element name and class."
         )
 
     uncurated = [element.element_id for element in truth if not element.curated]
@@ -175,12 +172,12 @@ def evaluate(
             "Benchmark truth file still has uncurated coordinates for: "
             + ", ".join(uncurated)
             + ". Fill in resources/benchmark/ (see its README) or pass --allow-uncurated "
-              "to emit them as 'uncurated' rows."
+            "to emit them as 'uncurated' rows."
         )
 
     results: list[dict[str, object]] = []
     for element in truth:
-        row: dict[str, object] = {column: NA for column in RECOVERY_COLUMNS}
+        row: dict[str, object] = dict.fromkeys(RECOVERY_COLUMNS, NA)
         row.update(
             {
                 "element_id": element.element_id,
@@ -310,9 +307,7 @@ def write_recovery(
                     "close to vacuous at this min-overlap-fraction. Raise it, or rely on "
                     "the q-values.\n"
                 )
-        writer = csv.DictWriter(
-            handle, fieldnames=RECOVERY_COLUMNS, delimiter="\t", lineterminator="\n"
-        )
+        writer = csv.DictWriter(handle, fieldnames=RECOVERY_COLUMNS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         for row in results:
             writer.writerow(row)
@@ -353,9 +348,7 @@ def main() -> int:
     loci = read_qvalues(args.qvalues)
     results = evaluate(truth, loci, args.min_overlap_fraction, args.allow_uncurated)
 
-    null_loci = [
-        [row for path in group for row in _read_locus_table(path)] for group in args.null_loci
-    ]
+    null_loci = [[row for path in group for row in _read_locus_table(path)] for group in args.null_loci]
     baseline = null_baseline(truth, null_loci, args.min_overlap_fraction) if null_loci else None
     write_recovery(results, args.output, baseline)
 

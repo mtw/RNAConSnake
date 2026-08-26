@@ -9,9 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rnaconsnake import __version__
-from rnaconsnake.export_annotations import analysis_root
+from rnaconsnake.export_annotations import analysis_root, manifest_block
 from rnaconsnake.export_annotations import collect as collect_annotations
-from rnaconsnake.export_annotations import manifest_block
 from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, read_json, write_json
 
 FEATURE_COLUMNS = [
@@ -105,7 +104,6 @@ def sanitize_id(value: str) -> str:
     return cleaned.strip("._-") or "dataset"
 
 
-
 def write_csv(path: Path, columns: list[str], rows: list[dict[str, object]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=columns)
@@ -141,7 +139,9 @@ def discover_summary_records(run_dir: Path) -> list[SummaryRecord]:
             raise ValueError(f"Summary record missing wbn: {path}")
         records.append(SummaryRecord(wlen=wlen, values=normalized, summary_path=path))
     if not records:
-        raise FileNotFoundError(f"No per-candidate summary JSON files found under {run_dir / 'generated_files' / 'summary'}")
+        raise FileNotFoundError(
+            f"No per-candidate summary JSON files found under {run_dir / 'generated_files' / 'summary'}"
+        )
     return records
 
 
@@ -232,7 +232,8 @@ def write_methods_markdown(path: Path, feature_label: str, maxbpspans: list[int]
                 f"- Feature label: {feature_label}",
                 f"- Window lengths: {', '.join(str(wlen) for wlen in maxbpspans)}",
                 "- Exported from RNAConSnake structured scientific outputs.",
-                "- Visualization and browser-style rendering are intentionally outside the scope of this bundle.",
+                "- Visualization and browser-style rendering are intentionally outside "
+                "the scope of this bundle.",
                 "",
             ]
         ),
@@ -240,7 +241,9 @@ def write_methods_markdown(path: Path, feature_label: str, maxbpspans: list[int]
     )
 
 
-def write_feature_markdown(path: Path, feature_row: dict[str, object], candidate_rows: list[dict[str, object]]) -> None:
+def write_feature_markdown(
+    path: Path, feature_row: dict[str, object], candidate_rows: list[dict[str, object]]
+) -> None:
     path.write_text(
         "\n".join(
             [
@@ -432,7 +435,11 @@ def build_export(args: argparse.Namespace) -> Path:
                 40,
             ),
             "refold_summary": (
-                summary_root / "generated_files" / "refold" / f"len_{record.wlen}" / f"{candidate_id}.refold.json",
+                summary_root
+                / "generated_files"
+                / "refold"
+                / f"len_{record.wlen}"
+                / f"{candidate_id}.refold.json",
                 f"{candidate_bundle_dir}/{candidate_id}.refold.json",
                 "Refold summary",
                 "json",
@@ -441,7 +448,12 @@ def build_export(args: argparse.Namespace) -> Path:
                 50,
             ),
             "alignment_plot_pdf": (
-                summary_root / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_aln.pdf",
+                summary_root
+                / "generated_files"
+                / "rnaalifold"
+                / f"len_{record.wlen}"
+                / candidate_id
+                / f"{candidate_id}_aln.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.alignment_plot.pdf",
                 "Alignment plot PDF",
                 "pdf",
@@ -450,7 +462,12 @@ def build_export(args: argparse.Namespace) -> Path:
                 60,
             ),
             "consensus_plot_pdf": (
-                summary_root / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_ss.pdf",
+                summary_root
+                / "generated_files"
+                / "rnaalifold"
+                / f"len_{record.wlen}"
+                / candidate_id
+                / f"{candidate_id}_ss.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.consensus_plot.pdf",
                 "Consensus secondary structure plot PDF",
                 "pdf",
@@ -462,7 +479,11 @@ def build_export(args: argparse.Namespace) -> Path:
 
         optional_files = {
             "rscape_pdf": (
-                summary_root / "generated_files" / "rscape" / f"len_{record.wlen}" / f"{candidate_id}.sto.pdf",
+                summary_root
+                / "generated_files"
+                / "rscape"
+                / f"len_{record.wlen}"
+                / f"{candidate_id}.sto.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.rscape.pdf",
                 "R-scape covariation PDF",
                 "pdf",
@@ -481,7 +502,15 @@ def build_export(args: argparse.Namespace) -> Path:
             ),
         }
 
-        for artifact_type, (source, relpath, label, file_format, is_optional, group_name, sort_order) in source_files.items():
+        for artifact_type, (
+            source,
+            relpath,
+            label,
+            file_format,
+            is_optional,
+            group_name,
+            sort_order,
+        ) in source_files.items():
             if not source.is_file():
                 raise FileNotFoundError(f"Missing required export artifact for {candidate_id}: {source}")
             bundle_relpath = copy_artifact(source, output_dir, relpath)
@@ -501,7 +530,15 @@ def build_export(args: argparse.Namespace) -> Path:
             )
 
         rscape_available = False
-        for artifact_type, (source, relpath, label, file_format, is_optional, group_name, sort_order) in optional_files.items():
+        for artifact_type, (
+            source,
+            relpath,
+            label,
+            file_format,
+            is_optional,
+            group_name,
+            sort_order,
+        ) in optional_files.items():
             if not source.is_file():
                 continue
             bundle_relpath = copy_artifact(source, output_dir, relpath)
@@ -521,7 +558,9 @@ def build_export(args: argparse.Namespace) -> Path:
             )
             rscape_available = True
 
-        cm_status_path = summary_root / "generated_files" / "cm" / f"len_{record.wlen}" / f"{candidate_id}.cm.status.json"
+        cm_status_path = (
+            summary_root / "generated_files" / "cm" / f"len_{record.wlen}" / f"{candidate_id}.cm.status.json"
+        )
         if cm_status_path.is_file():
             cm_status = read_json(cm_status_path)
             cm_relpath = str(cm_status.get("cm", "")).replace("\\", "/")
@@ -568,8 +607,12 @@ def build_export(args: argparse.Namespace) -> Path:
         "description": args.description or f"RNAConSnake export for {feature_label}",
         "source_label": source_label,
         "coordinate_label": "",
-        "top_score": max((parse_float(str(row["score_primary"]), default=0.0) for row in candidate_rows), default=0.0),
-        "covariation_supported_count": sum(1 for row in candidate_rows if parse_float(str(row["score_primary"]), default=0.0) > 0),
+        "top_score": max(
+            (parse_float(str(row["score_primary"]), default=0.0) for row in candidate_rows), default=0.0
+        ),
+        "covariation_supported_count": sum(
+            1 for row in candidate_rows if parse_float(str(row["score_primary"]), default=0.0) > 0
+        ),
         "rscape_count": sum(1 for row in candidate_rows if row["rscape_available"] == "true"),
         "summary_md": feature_summary_rel,
         "bundle_path": "",
@@ -666,9 +709,7 @@ def build_export(args: argparse.Namespace) -> Path:
             )
 
     if annotations.versions_file is not None:
-        bundle_relpath = copy_artifact(
-            annotations.versions_file, output_dir, "files/dataset/versions.yaml"
-        )
+        bundle_relpath = copy_artifact(annotations.versions_file, output_dir, "files/dataset/versions.yaml")
         add_artifact(
             artifacts,
             artifact_scope="dataset",
@@ -729,9 +770,13 @@ def validate_bundle(bundle_root: Path) -> None:
                 raise FileNotFoundError(f"Preview path does not exist: {resolved}")
         scope = row["artifact_scope"]
         if scope == "feature" and row.get("feature_id", "") not in feature_ids:
-            raise ValueError(f"Feature-scoped artifact references unknown feature_id: {row.get('feature_id', '')}")
+            raise ValueError(
+                f"Feature-scoped artifact references unknown feature_id: {row.get('feature_id', '')}"
+            )
         if scope == "candidate" and row.get("candidate_id", "") not in candidate_ids:
-            raise ValueError(f"Candidate-scoped artifact references unknown candidate_id: {row.get('candidate_id', '')}")
+            raise ValueError(
+                f"Candidate-scoped artifact references unknown candidate_id: {row.get('candidate_id', '')}"
+            )
 
 
 def parse_args() -> argparse.Namespace:
@@ -747,10 +792,14 @@ def parse_args() -> argparse.Namespace:
         default="other",
         help="Feature type label for features.csv, default: other",
     )
-    parser.add_argument("--input-alignment", help="Optional original input alignment path, used only for metadata defaults")
+    parser.add_argument(
+        "--input-alignment", help="Optional original input alignment path, used only for metadata defaults"
+    )
     parser.add_argument("--source-label", help="Optional source/provenance label")
     parser.add_argument("--description", help="Optional dataset/feature description")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite the output directory if it exists")
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite the output directory if it exists"
+    )
     return parser.parse_args()
 
 

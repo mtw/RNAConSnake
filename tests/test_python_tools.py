@@ -11,8 +11,7 @@ from pathlib import Path
 import pytest
 
 from rnaconsnake import cli
-from rnaconsnake.workflow_helpers import WorkflowSettings, CandidatePaths, initial_alignment_format_code
-
+from rnaconsnake.workflow_helpers import CandidatePaths, WorkflowSettings, initial_alignment_format_code
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -250,9 +249,7 @@ def test_cli_check_deps_checks_the_configured_tool_command(tmp_path: Path) -> No
     have worked and passes runs that then die mid-pipeline.
     """
     configfile = tmp_path / "config.yaml"
-    configfile.write_text(
-        "tools:\n  alifoldz: /nonexistent/dir/alifoldz.pl\n", encoding="utf-8"
-    )
+    configfile.write_text("tools:\n  alifoldz: /nonexistent/dir/alifoldz.pl\n", encoding="utf-8")
     result = subprocess.run(
         [PYTHON, "-m", "rnaconsnake.cli", "--check-deps", "--", "--configfile", str(configfile)],
         check=False,
@@ -268,9 +265,7 @@ def test_cli_check_deps_honours_optional_branches_from_the_config_file(tmp_path:
     """`do_rscape` and `null.method` enable branches with their own tools,
     whether they are switched on by flag or in the config file."""
     configfile = tmp_path / "config.yaml"
-    configfile.write_text(
-        'do_rscape: true\n"null":\n  method: sissiz\n  replicates: 2\n', encoding="utf-8"
-    )
+    configfile.write_text('do_rscape: true\n"null":\n  method: sissiz\n  replicates: 2\n', encoding="utf-8")
     env = subprocess_env()
     env["PATH"] = str(Path(PYTHON).resolve().parent)
     result = subprocess.run(
@@ -292,10 +287,14 @@ def test_cli_benchmark_requires_the_null_arm(tmp_path: Path) -> None:
     alignment.write_text("# STOCKHOLM 1.0\n//\n", encoding="utf-8")
     result = subprocess.run(
         [
-            PYTHON, "-m", "rnaconsnake.cli",
-            "--input-alignment", str(alignment),
+            PYTHON,
+            "-m",
+            "rnaconsnake.cli",
+            "--input-alignment",
+            str(alignment),
             "--benchmark",
-            "--cores", "1",
+            "--cores",
+            "1",
         ],
         check=False,
         capture_output=True,
@@ -363,8 +362,7 @@ def test_candidate_paths_exposes_canonical_workflow_locations() -> None:
     assert paths.rnaz_json == "generated_files/rnaz/len_150/RC_150_0001_aln_1_12.rnaz.json"
     assert paths.alifoldz_json == "generated_files/alifoldz/len_150/RC_150_0001_aln_1_12.alifoldz.json"
     assert paths.rnaalifold_stk == (
-        "generated_files/rnaalifold/len_150/RC_150_0001_aln_1_12/"
-        "RC_150_0001_aln_1_12.RNAalifold_results.stk"
+        "generated_files/rnaalifold/len_150/RC_150_0001_aln_1_12/RC_150_0001_aln_1_12.RNAalifold_results.stk"
     )
     assert paths.refold_json == "generated_files/refold/len_150/RC_150_0001_aln_1_12.refold.json"
     assert paths.maxcovar_json == "generated_files/maxcovar/len_150/RC_150_0001_aln_1_12.maxcovar.json"
@@ -444,8 +442,12 @@ def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) ->
 
     cm_status = run_dir / paths.cm_status_json
     cm_status.parent.mkdir(parents=True, exist_ok=True)
-    cm_status.write_text('{"built": true, "cm": "generated_files/cm/len_150/RC_150_0001_aln_1_12.cm"}\n', encoding="utf-8")
-    (run_dir / "generated_files" / "cm" / "len_150" / f"{candidate_id}.cm").write_text("CM\n", encoding="utf-8")
+    cm_status.write_text(
+        '{"built": true, "cm": "generated_files/cm/len_150/RC_150_0001_aln_1_12.cm"}\n', encoding="utf-8"
+    )
+    (run_dir / "generated_files" / "cm" / "len_150" / f"{candidate_id}.cm").write_text(
+        "CM\n", encoding="utf-8"
+    )
 
     bundle_dir = tmp_path / "bundle"
     result = subprocess.run(
@@ -488,7 +490,10 @@ def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) ->
     assert "sci" in candidates_text
     assert "consensus_mfe" in candidates_text
     assert "alifoldzscore" in candidates_text
-    assert "artifact_scope,artifact_owner_id,artifact_type,artifact_label,file_format,path,is_optional" in artifacts_text
+    assert (
+        "artifact_scope,artifact_owner_id,artifact_type,artifact_label,file_format,path,is_optional"
+        in artifacts_text
+    )
     assert "np.mlocarna2020" in features_text
     assert candidate_id in candidates_text
     assert "0.95" in candidates_text
@@ -502,8 +507,12 @@ def test_export_bundle_writes_spec_files_and_copies_artifacts(tmp_path: Path) ->
     assert (bundle_dir / "methods.md").is_file()
     assert (bundle_dir / "feature_summaries" / "np.mlocarna2020.md").is_file()
     assert (bundle_dir / "candidate_summaries" / f"{candidate_id}.md").is_file()
-    assert (bundle_dir / "files" / "np.mlocarna2020" / candidate_id / f"{candidate_id}.alignment_plot.pdf").is_file()
-    assert (bundle_dir / "files" / "np.mlocarna2020" / candidate_id / f"{candidate_id}.consensus_plot.pdf").is_file()
+    assert (
+        bundle_dir / "files" / "np.mlocarna2020" / candidate_id / f"{candidate_id}.alignment_plot.pdf"
+    ).is_file()
+    assert (
+        bundle_dir / "files" / "np.mlocarna2020" / candidate_id / f"{candidate_id}.consensus_plot.pdf"
+    ).is_file()
 
 
 def test_render_reports_writes_log_csv_and_markdown(tmp_path: Path) -> None:
@@ -767,8 +776,12 @@ def test_split_stockholm_matches_real_lalifold_sample(tmp_path: Path) -> None:
         env=subprocess_env(),
     )
 
-    assert read_text(tmp_path / "RC_100_0001_aln_2294_2375.stk") == read_text(real / "RC_100_0001_aln_2294_2375.stk")
-    assert read_text(tmp_path / "RC_100_0001_aln_4042_4067.stk") == read_text(real / "RC_100_0001_aln_4042_4067.stk")
+    assert read_text(tmp_path / "RC_100_0001_aln_2294_2375.stk") == read_text(
+        real / "RC_100_0001_aln_2294_2375.stk"
+    )
+    assert read_text(tmp_path / "RC_100_0001_aln_4042_4067.stk") == read_text(
+        real / "RC_100_0001_aln_4042_4067.stk"
+    )
 
 
 def test_remove_gaponly_matches_expected_output(tmp_path: Path) -> None:
@@ -1238,15 +1251,15 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
             PYTHON,
             "-m",
             "rnaconsnake.cli",
-                "--input-alignment",
-                str(input_alignment),
-                "--output-dir",
-                str(tmp_path),
-                "--export-bundle",
-                str(export_dir),
-                "--maxbpspan",
-                "150",
-                "--rscape",
+            "--input-alignment",
+            str(input_alignment),
+            "--output-dir",
+            str(tmp_path),
+            "--export-bundle",
+            str(export_dir),
+            "--maxbpspan",
+            "150",
+            "--rscape",
             "--cores",
             "1",
             "--",
@@ -1354,13 +1367,7 @@ def test_cli_workflow_smoke_test_accepts_clustal_input(tmp_path: Path) -> None:
     assert "fake RNALalifold completed for window 150 format C" in read_text(
         tmp_path / "Lalifold" / "len_150" / "RNALalifold.out"
     )
-    assert (
-        tmp_path
-        / "generated_files"
-        / "rscape"
-        / "len_150"
-        / "RC_150_0001_aln_1_12.power"
-    ).is_file()
+    assert (tmp_path / "generated_files" / "rscape" / "len_150" / "RC_150_0001_aln_1_12.power").is_file()
     assert "RC_150_0001_aln_1_12" in read_text(
         tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.log"
     )
@@ -1559,8 +1566,8 @@ def test_null_model_make_arm_copies_real_alignment_verbatim(tmp_path: Path) -> N
 
 
 def test_null_model_pool_roundtrip_with_fake_backend(tmp_path: Path) -> None:
-    from rnaconsnake.tools.null_model import make_arm_alignment, simulate_pool
     from rnaconsnake.tools.alignment_io import read_stockholm_alignment
+    from rnaconsnake.tools.null_model import make_arm_alignment, simulate_pool
 
     if shutil.which("perl") is None:  # pragma: no cover - perl is present on CI
         pytest.skip("perl is required for the rnazRandomizeAln backend")
@@ -1689,9 +1696,7 @@ def test_cluster_by_containment_keeps_adjacent_elements_apart() -> None:
 
     # 712-799 with two nested fragments, plus 694-713 which merely overlaps it.
     rows = _window_rows([(712, 799), (719, 794), (745, 759), (694, 713)])
-    clusters = cluster_candidates(
-        candidates_from_records(rows), method="containment", label="len100"
-    )
+    clusters = cluster_candidates(candidates_from_records(rows), method="containment", label="len100")
     spans = [(c.start, c.end, len(c.members)) for c in clusters]
     assert spans == [(694, 713, 1), (712, 799, 3)]
 
@@ -1743,8 +1748,7 @@ def test_substructure_clustering_uses_base_pair_subsets() -> None:
     grouped = {c.locus_id: sorted(m.name for m in c.members) for c in clusters}
     # 1-12 shares every pair with 1-20; 5-16 folds differently and stays apart.
     assert any(
-        set(members) == {"RC_100_0001_aln_1_12", "RC_100_0001_aln_1_20"}
-        for members in grouped.values()
+        set(members) == {"RC_100_0001_aln_1_12", "RC_100_0001_aln_1_20"} for members in grouped.values()
     )
     assert any(members == ["RC_100_0001_aln_5_16"] for members in grouped.values())
 
@@ -1833,9 +1837,7 @@ def test_calibration_summary_records_every_clustering_parameter(tmp_path: Path) 
     }
     for index in range(2):
         arm = f"null_{index:03d}"
-        arm_inputs[arm] = {
-            100: _write_summary_csv(tmp_path / f"{arm}.csv", _candidate_rows(0.20, 0.5, "0"))
-        }
+        arm_inputs[arm] = {100: _write_summary_csv(tmp_path / f"{arm}.csv", _candidate_rows(0.20, 0.5, "0"))}
 
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -1861,9 +1863,7 @@ def test_calibrate_writes_funnel_qvalues_and_summary(tmp_path: Path) -> None:
     }
     for index in range(3):
         arm = f"null_{index:03d}"
-        arm_inputs[arm] = {
-            100: _write_summary_csv(tmp_path / f"{arm}.csv", _candidate_rows(0.20, 0.5, "0"))
-        }
+        arm_inputs[arm] = {100: _write_summary_csv(tmp_path / f"{arm}.csv", _candidate_rows(0.20, 0.5, "0"))}
 
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -1902,12 +1902,8 @@ def test_calibrate_is_reproducible_for_identical_inputs(tmp_path: Path) -> None:
 
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "2"))},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.30, -0.5, "0"))
-        },
-        "null_001": {
-            100: _write_summary_csv(tmp_path / "n1.csv", _candidate_rows(0.95, -3.0, "1"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.30, -0.5, "0"))},
+        "null_001": {100: _write_summary_csv(tmp_path / "n1.csv", _candidate_rows(0.95, -3.0, "1"))},
     }
     thresholds = Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2)
     for tag in ["a", "b"]:
@@ -1939,9 +1935,7 @@ def test_calibrate_warns_when_collapse_ratio_diverges_between_arms(tmp_path: Pat
     ]
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", real_rows)},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "0"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "0"))},
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -1960,9 +1954,7 @@ def test_calibrate_rejects_stage_one_looser_than_reported_threshold(tmp_path: Pa
 
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "1"))},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))},
     }
     with pytest.raises(ValueError, match="stage1_rnaz_prob"):
         calibrate(
@@ -1982,9 +1974,7 @@ def test_calibrate_treats_stage_one_skips_as_failing_alifoldz(tmp_path: Path) ->
         row["alifoldzscore"] = "NA"
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", skipped)},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))},
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -2105,13 +2095,13 @@ def test_cli_null_arm_options_resolve_to_a_full_config_section(tmp_path: Path) -
     )
 
     def namespace(**overrides):
-        base = dict(
-            null_arm=None,
-            null_replicates=None,
-            null_seed=None,
-            no_two_stage=False,
-            null_pool=None,
-        )
+        base = {
+            "null_arm": None,
+            "null_replicates": None,
+            "null_seed": None,
+            "no_two_stage": False,
+            "null_pool": None,
+        }
         base.update(overrides)
         return _argparse.Namespace(**base)
 
@@ -2131,9 +2121,7 @@ def test_cli_null_arm_options_resolve_to_a_full_config_section(tmp_path: Path) -
         "two_stage": False,
     }
 
-    pinned = cli.resolve_null_config(
-        namespace(null_arm="sissiz", null_pool="/tmp/pool.stk"), str(configfile)
-    )
+    pinned = cli.resolve_null_config(namespace(null_arm="sissiz", null_pool="/tmp/pool.stk"), str(configfile))
     assert pinned["pool_file"].endswith("/tmp/pool.stk")
     # An unset pool must not travel as the string "None": Snakemake stringifies
     # nested --config values, and "None" is a truthy filename.
@@ -2170,9 +2158,7 @@ def test_snakefile_has_no_duplicated_rule_bodies() -> None:
         match = _re.match(r"\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", block)
         if not match:
             continue
-        body = "\n".join(
-            line.strip() for line in block.split("\n", 1)[1].splitlines() if line.strip()
-        )
+        body = "\n".join(line.strip() for line in block.split("\n", 1)[1].splitlines() if line.strip())
         if not body:
             continue
         for other, other_body in bodies.items():
@@ -2341,11 +2327,18 @@ def test_ci_test_profile_builds_the_calibrated_dag(tmp_path: Path) -> None:
 
     result = subprocess.run(
         [
-            PYTHON, "-m", "snakemake", "-n",
-            "--snakefile", str(ROOT / "snakefile"),
-            "--profile", str(ROOT / "profiles" / "test"),
-            "--directory", str(tmp_path),
-            "--configfile", str(configfile),
+            PYTHON,
+            "-m",
+            "snakemake",
+            "-n",
+            "--snakefile",
+            str(ROOT / "snakefile"),
+            "--profile",
+            str(ROOT / "profiles" / "test"),
+            "--directory",
+            str(tmp_path),
+            "--configfile",
+            str(configfile),
         ],
         check=False,
         capture_output=True,
@@ -2435,9 +2428,7 @@ def test_calibrate_drops_rscape_from_cascade_when_it_never_ran(tmp_path: Path) -
 
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "NA"))},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "NA"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "NA"))},
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -2459,9 +2450,7 @@ def test_calibrate_keeps_rscape_in_cascade_when_it_ran(tmp_path: Path) -> None:
 
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "0"))},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "0"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.10, 1.0, "0"))},
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -2724,13 +2713,7 @@ def test_strip_aln_uppercases_sequences_for_the_perl_toolchain(tmp_path: Path) -
 
 def test_strip_aln_leaves_uppercase_alignments_untouched(tmp_path: Path) -> None:
     source = tmp_path / "upper.stk"
-    body = (
-        "# STOCKHOLM 1.0\n"
-        "#=GF ID upper\n"
-        "Seq_a TCAGACCACTTAG--TGCC\n"
-        "Seq_b TCAGATCCGAAA---GGCC\n"
-        "//\n"
-    )
+    body = "# STOCKHOLM 1.0\n#=GF ID upper\nSeq_a TCAGACCACTTAG--TGCC\nSeq_b TCAGATCCGAAA---GGCC\n//\n"
     source.write_text(body, encoding="utf-8")
     result = subprocess.run(
         [PYTHON, "-m", "rnaconsnake.tools.strip_aln", "-a", str(source), "-f", "S", "--nosingle"],
@@ -2797,15 +2780,14 @@ def test_non_redundant_table_reports_one_row_per_locus(tmp_path: Path) -> None:
             "alilen": "20",
         },
     ]
-    clusters = cluster_candidates(
-        candidates_from_records(rows), method="containment", label="len100"
-    )
+    clusters = cluster_candidates(candidates_from_records(rows), method="containment", label="len100")
     output = tmp_path / "RNAConSnake.nr.csv"
     write_non_redundant_csv(clusters, output)
 
     import csv as _csv
 
-    written = list(_csv.DictReader(open(output, encoding="utf-8")))
+    with open(output, encoding="utf-8") as handle:
+        written = list(_csv.DictReader(handle))
     assert [row["locus_id"] for row in written] == ["len100_0002", "len100_0001"]
     assert list(written[0]) == NR_COLUMNS
 
@@ -2843,9 +2825,7 @@ def test_calibration_counts_the_same_loci_the_ranked_table_reports(tmp_path: Pat
     ]
     arm_inputs = {
         "real": {100: _write_summary_csv(tmp_path / "real.csv", rows)},
-        "null_000": {
-            100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))
-        },
+        "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.1, 1.0, "0"))},
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
@@ -2948,9 +2928,10 @@ def test_dereplication_doc_is_linked_from_the_user_docs() -> None:
 
 
 def _render_markdown(tmp_path: Path, nr_rows, full_rows, method="containment"):
+    import csv as _csv
+
     from rnaconsnake.tools.dereplicate import NR_COLUMNS
     from rnaconsnake.workflow_helpers import SUMMARY_FIELDS
-    import csv as _csv
 
     nr = tmp_path / "RNAConSnake.nr.csv"
     with open(nr, "w", encoding="utf-8", newline="") as handle:
@@ -2973,11 +2954,16 @@ def _render_markdown(tmp_path: Path, nr_rows, full_rows, method="containment"):
             "-m",
             "rnaconsnake.tools.legacy_postprocess",
             "render-markdown",
-            "--label", "len_200",
-            "--nr", str(nr),
-            "--full", str(full),
-            "--output", str(out),
-            "--method", method,
+            "--label",
+            "len_200",
+            "--nr",
+            str(nr),
+            "--full",
+            str(full),
+            "--output",
+            str(out),
+            "--method",
+            method,
         ],
         check=True,
         capture_output=True,
@@ -3063,9 +3049,12 @@ def test_write_summary_outputs_markdown_is_optional(tmp_path: Path) -> None:
             "-m",
             "rnaconsnake.tools.legacy_postprocess",
             "write-summary-outputs",
-            "--label", "len_100",
-            "--log", str(tmp_path / "RNAConSnake.log"),
-            "--csv", str(tmp_path / "RNAConSnake.log.csv"),
+            "--label",
+            "len_100",
+            "--log",
+            str(tmp_path / "RNAConSnake.log"),
+            "--csv",
+            str(tmp_path / "RNAConSnake.log.csv"),
             str(summary),
         ],
         check=True,
@@ -3094,8 +3083,9 @@ def test_export_annotations_resolve_the_real_arm(tmp_path: Path) -> None:
 
 
 def _write_nr_table(run_dir: Path, wlen: int, rows: list[dict[str, str]], method="containment"):
-    from rnaconsnake.tools.dereplicate import NR_COLUMNS
     import csv as _csv
+
+    from rnaconsnake.tools.dereplicate import NR_COLUMNS
 
     target = run_dir / "generated_files" / "summary" / f"len_{wlen}"
     target.mkdir(parents=True, exist_ok=True)
@@ -3259,19 +3249,14 @@ WEB_FORBIDDEN_PATHS = (".html", ".jinja", ".j2", ".css", ".js")
 
 
 def _tracked_files() -> list[Path]:
-    result = subprocess.run(
-        ["git", "ls-files"], check=True, capture_output=True, text=True, cwd=str(ROOT)
-    )
+    result = subprocess.run(["git", "ls-files"], check=True, capture_output=True, text=True, cwd=str(ROOT))
     return [Path(line) for line in result.stdout.splitlines() if line]
 
 
 def test_no_web_assets_are_tracked() -> None:
-    offenders = [
-        path for path in _tracked_files() if path.suffix.lower() in WEB_FORBIDDEN_PATHS
-    ]
-    assert not offenders, (
-        "web assets are out of scope for RNAConSnake: "
-        + ", ".join(str(path) for path in offenders)
+    offenders = [path for path in _tracked_files() if path.suffix.lower() in WEB_FORBIDDEN_PATHS]
+    assert not offenders, "web assets are out of scope for RNAConSnake: " + ", ".join(
+        str(path) for path in offenders
     )
 
 
@@ -3293,9 +3278,7 @@ def test_no_rendering_code_or_dependency_is_tracked() -> None:
             continue
         for match in pattern.finditer(text):
             offenders.append(f"{path}: {match.group(0)!r}")
-    assert not offenders, "presentation-layer code leaked into RNAConSnake:\n" + "\n".join(
-        offenders
-    )
+    assert not offenders, "presentation-layer code leaked into RNAConSnake:\n" + "\n".join(offenders)
 
 
 def test_packaging_declares_no_web_dependencies() -> None:
@@ -3468,7 +3451,7 @@ def test_snakefile_seeds_alifoldz_per_candidate() -> None:
     calibration irreproducible no matter how the null pool was generated.
     """
     text = read_text(Path("snakefile"))
-    assert "ALIFOLDZ_SEED = config.get(\"alifoldz_seed\")" in text
+    assert 'ALIFOLDZ_SEED = config.get("alifoldz_seed")' in text
     assert "perl_seeded_command(" in text
     assert "derived_seed(int(ALIFOLDZ_SEED), wildcards.file)" in text
 
@@ -3477,23 +3460,18 @@ def test_config_seeds_alifoldz_by_default() -> None:
     import yaml as _yaml
 
     payload = _yaml.safe_load(read_text(Path("config.yaml")))
-    assert payload.get("alifoldz_seed") is not None, (
-        "a calibrated run must be reproducible by default"
-    )
+    assert payload.get("alifoldz_seed") is not None, "a calibrated run must be reproducible by default"
 
 
 def test_null_settings_accepts_a_pinned_pool() -> None:
     from rnaconsnake.workflow_helpers import NullSettings
 
-    settings = NullSettings.from_config(
-        {"null": {"method": "sissiz", "pool_file": "/tmp/pool.stk"}}
-    )
+    settings = NullSettings.from_config({"null": {"method": "sissiz", "pool_file": "/tmp/pool.stk"}})
     assert settings.pool_file == "/tmp/pool.stk"
     # Snakemake stringifies nested --config values, so "None" must not be a path.
     for sentinel in ["None", "", "null", "~"]:
         assert (
-            NullSettings.from_config({"null": {"method": "sissiz", "pool_file": sentinel}}).pool_file
-            is None
+            NullSettings.from_config({"null": {"method": "sissiz", "pool_file": sentinel}}).pool_file is None
         )
 
 
@@ -3506,14 +3484,10 @@ def test_wide_window_does_not_absorb_small_distinct_elements() -> None:
     from rnaconsnake.tools.dereplicate import candidates_from_records, cluster_candidates
 
     rows = _window_rows([(1, 200), (10, 70), (90, 150), (160, 200)])
-    merged = cluster_candidates(
-        candidates_from_records(rows), method="containment", max_container_width=0
-    )
+    merged = cluster_candidates(candidates_from_records(rows), method="containment", max_container_width=0)
     assert len(merged) == 1, "without the guard everything collapses"
 
-    guarded = cluster_candidates(
-        candidates_from_records(rows), method="containment", max_container_width=120
-    )
+    guarded = cluster_candidates(candidates_from_records(rows), method="containment", max_container_width=120)
     assert len(guarded) == 4
 
 
@@ -3584,8 +3558,8 @@ def test_structural_domains_descend_through_long_range_pairs() -> None:
     from rnaconsnake.tools.benchmark_scaffold import structural_domains
 
     # One long-range pair enclosing two element-scale hairpins.
-    left = "(((((....)))))"          # 14 nt, 5 bp
-    right = "((((......))))"         # 14 nt, 5 bp
+    left = "(((((....)))))"  # 14 nt, 5 bp
+    right = "((((......))))"  # 14 nt, 5 bp
     structure = "(" + left + "....." + right + ")"
 
     wide = structural_domains(structure, max_width=200, min_width=5, min_pairs=3)
@@ -3612,9 +3586,7 @@ def test_read_ss_cons_requires_a_reference_structure(tmp_path: Path) -> None:
         read_ss_cons(bare)
 
     annotated = tmp_path / "annotated.stk"
-    annotated.write_text(
-        "# STOCKHOLM 1.0\nseqA ACGU\nseqB ACGA\n#=GC SS_cons <<>>\n//\n", encoding="utf-8"
-    )
+    annotated.write_text("# STOCKHOLM 1.0\nseqA ACGU\nseqB ACGA\n#=GC SS_cons <<>>\n//\n", encoding="utf-8")
     structure, n_seq = read_ss_cons(annotated)
     assert structure == "<<>>" and n_seq == 2
 
@@ -3688,7 +3660,7 @@ def test_shipped_jevg_truth_file_is_fully_curated() -> None:
 
     # Spans are ordered, non-overlapping and within the alignment.
     spans = sorted((e.start, e.end) for e in truth)
-    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:]))
+    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:], strict=False))
     assert spans[0][0] >= 1 and spans[-1][1] <= 711
 
     # No placeholders survive, so the benchmark accepts it.
@@ -3847,9 +3819,9 @@ def test_null_baseline_summarises_chance_recovery(tmp_path: Path) -> None:
 
     truth = _two_elements(tmp_path)
     arms = [
-        [_locus("n1", 90, 210)],                       # covers e1 only
+        [_locus("n1", 90, 210)],  # covers e1 only
         [_locus("n1", 90, 210), _locus("n2", 390, 510)],  # covers both
-        [],                                             # covers neither
+        [],  # covers neither
     ]
     baseline = null_baseline(truth, arms, min_overlap_fraction=0.5)
     assert baseline["arms"] == 3
@@ -3877,9 +3849,7 @@ def test_recovery_report_warns_when_the_overlap_test_is_vacuous(tmp_path: Path) 
     from rnaconsnake.tools.benchmark import evaluate, write_recovery
 
     truth = _two_elements(tmp_path)
-    results = evaluate(
-        truth, [_locus("r1", 90, 210), _locus("r2", 390, 510)], 0.5, allow_uncurated=True
-    )
+    results = evaluate(truth, [_locus("r1", 90, 210), _locus("r2", 390, 510)], 0.5, allow_uncurated=True)
     output = tmp_path / "recovery.tsv"
     write_recovery(results, output, {"arms": 10, "mean": 1.8, "min": 1, "max": 2})
     text = read_text(output)
@@ -3891,9 +3861,7 @@ def test_recovery_report_is_quiet_when_the_margin_is_real(tmp_path: Path) -> Non
     from rnaconsnake.tools.benchmark import evaluate, write_recovery
 
     truth = _two_elements(tmp_path)
-    results = evaluate(
-        truth, [_locus("r1", 90, 210), _locus("r2", 390, 510)], 0.5, allow_uncurated=True
-    )
+    results = evaluate(truth, [_locus("r1", 90, 210), _locus("r2", 390, 510)], 0.5, allow_uncurated=True)
     output = tmp_path / "recovery.tsv"
     write_recovery(results, output, {"arms": 10, "mean": 0.4, "min": 0, "max": 1})
     text = read_text(output)
@@ -3916,8 +3884,7 @@ def test_one_null_loci_group_is_one_arm(tmp_path: Path) -> None:
     )
     qvalues = tmp_path / "qvalues.tsv"
     qvalues.write_text(
-        "locus_id\twlen\tstart\tend\trnazprob\talifoldzscore\n"
-        "len100_0001\t100\t90\t210\t0.99\t-3.0\n",
+        "locus_id\twlen\tstart\tend\trnazprob\talifoldzscore\nlen100_0001\t100\t90\t210\t0.99\t-3.0\n",
         encoding="utf-8",
     )
     header = "locus_id,locus_start,locus_end,n_windows,members,wbn,rnazprob,alifoldzscore\n"
@@ -3929,12 +3896,20 @@ def test_one_null_loci_group_is_one_arm(tmp_path: Path) -> None:
     output = tmp_path / "recovery.tsv"
     subprocess.run(
         [
-            PYTHON, "-m", "rnaconsnake.tools.benchmark",
-            "--truth", str(truth_path),
-            "--qvalues", str(qvalues),
-            "--output", str(output),
-            "--alignment", "aln",
-            "--null-loci", str(len100), str(len200),
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.benchmark",
+            "--truth",
+            str(truth_path),
+            "--qvalues",
+            str(qvalues),
+            "--output",
+            str(output),
+            "--alignment",
+            "aln",
+            "--null-loci",
+            str(len100),
+            str(len200),
         ],
         check=True,
         capture_output=True,
@@ -3986,8 +3961,7 @@ def test_read_locus_table_accepts_the_non_redundant_csv(tmp_path: Path) -> None:
     )
     rows = _read_locus_table(path)
     assert rows == [
-        {"locus_id": "len100_0001", "start": "10", "end": "90",
-         "rnazprob": "0.97", "alifoldzscore": "-3.1"}
+        {"locus_id": "len100_0001", "start": "10", "end": "90", "rnazprob": "0.97", "alifoldzscore": "-3.1"}
     ]
 
 
@@ -3999,9 +3973,9 @@ def test_representative_rules_behave_as_documented() -> None:
     )
 
     rows = _window_rows([(1, 100), (20, 60), (30, 45)])
-    rows[0]["rnazprob"], rows[0]["alifoldzscore"] = "0.70", "-1.0"   # widest, weakest RNAz
-    rows[1]["rnazprob"], rows[1]["alifoldzscore"] = "0.99", "-2.0"   # best RNAz
-    rows[2]["rnazprob"], rows[2]["alifoldzscore"] = "0.80", "-4.0"   # best AlifoldZ
+    rows[0]["rnazprob"], rows[0]["alifoldzscore"] = "0.70", "-1.0"  # widest, weakest RNAz
+    rows[1]["rnazprob"], rows[1]["alifoldzscore"] = "0.99", "-2.0"  # best RNAz
+    rows[2]["rnazprob"], rows[2]["alifoldzscore"] = "0.80", "-4.0"  # best AlifoldZ
     members = candidates_from_records(rows)
 
     assert select_representative(members, "best_rnaz").width == 41
@@ -4010,9 +3984,7 @@ def test_representative_rules_behave_as_documented() -> None:
 
     with pytest.raises(ValueError, match="Unknown representative rule"):
         select_representative(members, "vibes")
-    assert set(REPRESENTATIVE_RULES) == {
-        "best_rnaz", "widest", "best_alifoldz", "widest_of_top_half"
-    }
+    assert set(REPRESENTATIVE_RULES) == {"best_rnaz", "widest", "best_alifoldz", "widest_of_top_half"}
 
 
 def test_widest_representative_keeps_a_multi_lobed_element_whole() -> None:
@@ -4021,8 +3993,8 @@ def test_widest_representative_keeps_a_multi_lobed_element_whole() -> None:
     from rnaconsnake.tools.dereplicate import candidates_from_records, cluster_candidates
 
     rows = _window_rows([(425, 497), (431, 472)])
-    rows[0]["rnazprob"], rows[0]["alifoldzscore"] = "0.992", "-2.4"   # whole element
-    rows[1]["rnazprob"], rows[1]["alifoldzscore"] = "0.995", "-1.8"   # one lobe, scores better
+    rows[0]["rnazprob"], rows[0]["alifoldzscore"] = "0.992", "-2.4"  # whole element
+    rows[1]["rnazprob"], rows[1]["alifoldzscore"] = "0.995", "-1.8"  # one lobe, scores better
     members = candidates_from_records(rows)
 
     by_rnaz = cluster_candidates(members, method="containment", representative_rule="best_rnaz")
@@ -4134,9 +4106,7 @@ def test_enumerate_subsets_samples_deterministically_when_large() -> None:
     second = enumerate_subsets(alignment, n_seq=2, max_subsets=3, seed=7)
     assert len(first) == 3
     assert [s.names for s in first] == [s.names for s in second]
-    assert [s.names for s in first] != [
-        s.names for s in enumerate_subsets(alignment, 2, 3, seed=8)
-    ]
+    assert [s.names for s in first] != [s.names for s in enumerate_subsets(alignment, 2, 3, seed=8)]
 
 
 def test_enumerate_subsets_rejects_impossible_sizes() -> None:
@@ -4191,7 +4161,7 @@ def test_shipped_denvg_truth_file_is_the_held_out_test_set() -> None:
     assert all(e.curated for e in truth)
 
     spans = sorted((e.start, e.end) for e in truth)
-    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:]))
+    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:], strict=False))
     assert spans[-1][1] <= 488
 
     text = read_text(Path("resources/benchmark/denvg_3utr_elements.tsv"))
@@ -4250,11 +4220,11 @@ def test_readme_documents_the_tools_conda_cannot_supply() -> None:
 def test_readme_covers_the_features_added_this_cycle() -> None:
     readme = read_text(Path("README.md"))
     for topic in [
-        "null-model calibration",   # the calibration arm
-        "De-replicating",           # locus de-replication
-        "screenability",            # blind-region reporting
-        "Positive control",         # benchmark
-        "container",                # containerised toolchain
+        "null-model calibration",  # the calibration arm
+        "De-replicating",  # locus de-replication
+        "screenability",  # blind-region reporting
+        "Positive control",  # benchmark
+        "container",  # containerised toolchain
     ]:
         assert topic.lower() in readme.lower(), f"README does not mention {topic}"
 
@@ -4269,9 +4239,7 @@ def test_readme_links_resolve() -> None:
     import re as _re
 
     readme = read_text(Path("README.md"))
-    targets = [
-        t for t in _re.findall(r"\[`[^`]+`\]\(([^)]+)\)", readme) if not t.startswith("http")
-    ]
+    targets = [t for t in _re.findall(r"\[`[^`]+`\]\(([^)]+)\)", readme) if not t.startswith("http")]
     for target in targets:
         assert Path(target).exists(), f"README links to a missing path: {target}"
 
@@ -4283,10 +4251,7 @@ def test_readme_links_resolve() -> None:
         text=True,
         cwd=str(ROOT),
     ).stdout.split()
-    assert not ignored, (
-        "README links to gitignored paths, which would 404 in a clone: "
-        + ", ".join(ignored)
-    )
+    assert not ignored, "README links to gitignored paths, which would 404 in a clone: " + ", ".join(ignored)
 
 
 def test_public_container_dir_has_no_lab_tooling() -> None:
@@ -4335,6 +4300,4 @@ def test_no_text_file_discloses_a_non_public_downstream_project() -> None:
         for match in disclosive.finditer(text):
             line = text[: match.start()].count("\n") + 1
             offenders.append(f"{path}:{line}: {match.group(0)!r}")
-    assert not offenders, (
-        "public files disclose a non-public downstream project:\n" + "\n".join(offenders)
-    )
+    assert not offenders, "public files disclose a non-public downstream project:\n" + "\n".join(offenders)

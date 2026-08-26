@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass
@@ -29,13 +29,18 @@ def parse_stockholm_records(path: str | Path) -> list[StockholmRecord]:
     records: list[StockholmRecord] = []
     current = _new_record()
 
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.rstrip("\n")
             if not line:
                 continue
             if line == "//":
-                if current["seq_order"] or current["gf_lines"] or current["gc_lines"] or current["other_lines"]:
+                if (
+                    current["seq_order"]
+                    or current["gf_lines"]
+                    or current["gc_lines"]
+                    or current["other_lines"]
+                ):
                     records.append(_record_from_parts(current))
                 current = _new_record()
                 continue

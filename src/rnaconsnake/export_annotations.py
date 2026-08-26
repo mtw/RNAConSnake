@@ -19,7 +19,6 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 CALIBRATION_DIRNAME = "calibration"
 RESULTS_DIRNAME = "results"
 REAL_ARM_DIRNAME = "arms/real"
@@ -136,9 +135,7 @@ def read_locus_annotations(
                 representative = _clean(row.get("wbn"))
                 if not representative:
                     continue
-                members = tuple(
-                    member for member in (row.get("members") or "").split(";") if member
-                )
+                members = tuple(member for member in (row.get("members") or "").split(";") if member)
                 annotation = LocusAnnotation(
                     locus_id=_clean(row.get("locus_id")),
                     locus_start=int(row.get("locus_start") or 0),

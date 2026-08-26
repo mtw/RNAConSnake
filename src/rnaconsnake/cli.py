@@ -90,7 +90,9 @@ def parse_args() -> argparse.Namespace:
         "--maxbpspan",
         type=int,
         action="append",
-        help="Override maxbpspan values from config.yaml. Repeat the option to provide multiple window sizes.",
+        help=(
+            "Override maxbpspan values from config.yaml. Repeat the option to provide multiple window sizes."
+        ),
     )
     parser.add_argument(
         "--rscape",
@@ -218,9 +220,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Show the configured external tool commands and resolved executable paths, then exit.",
     )
-    parser.add_argument("--check-deps", action="store_true", help="Check external runtime dependencies and exit")
+    parser.add_argument(
+        "--check-deps", action="store_true", help="Check external runtime dependencies and exit"
+    )
     parser.add_argument("--version", action="store_true", help="Show version and exit")
-    parser.add_argument("snakemake_args", nargs=argparse.REMAINDER, help="Additional args passed through to snakemake")
+    parser.add_argument(
+        "snakemake_args", nargs=argparse.REMAINDER, help="Additional args passed through to snakemake"
+    )
     return parser.parse_args()
 
 
@@ -231,9 +237,7 @@ NULL_METHOD_TOOLS = {
 
 # The default executable behind each null-model backend, for messages that name
 # the program rather than the tool key.
-NULL_METHOD_DEPENDENCIES = {
-    method: DEFAULT_TOOL_COMMANDS[name] for method, name in NULL_METHOD_TOOLS.items()
-}
+NULL_METHOD_DEPENDENCIES = {method: DEFAULT_TOOL_COMMANDS[name] for method, name in NULL_METHOD_TOOLS.items()}
 
 
 def tool_command(name: str, configured_tools: dict[str, str] | None = None) -> str:
@@ -271,9 +275,7 @@ def check_dependencies(
         tokens = shlex.split(command)
         executable = tokens[0] if tokens else ""
         if not executable or shutil.which(executable) is None:
-            missing.append(
-                command if command == executable else f"{executable} (from {name}: {command})"
-            )
+            missing.append(command if command == executable else f"{executable} (from {name}: {command})")
 
     if missing:
         print("Missing runtime dependencies:", file=sys.stderr)
@@ -527,7 +529,9 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
                 if not line.strip():
                     total, counts = parse_job_stats_lines(current_stats)
                     if total and overall is None:
-                        overall = tqdm(total=total, desc="Overall", position=0, leave=True, dynamic_ncols=True)
+                        overall = tqdm(
+                            total=total, desc="Overall", position=0, leave=True, dynamic_ncols=True
+                        )
                         for position, (rule, count) in enumerate(sorted(counts.items()), start=1):
                             bars[rule] = tqdm(
                                 total=count,
@@ -566,7 +570,9 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
             if total and overall is None:
                 overall = tqdm(total=total, desc="Overall", position=0, leave=True, dynamic_ncols=True)
                 for position, (rule, count) in enumerate(sorted(counts.items()), start=1):
-                    bars[rule] = tqdm(total=count, desc=rule, position=position, leave=True, dynamic_ncols=True)
+                    bars[rule] = tqdm(
+                        total=count, desc=rule, position=position, leave=True, dynamic_ncols=True
+                    )
         if overall is not None:
             overall.close()
         for bar in bars.values():

@@ -32,7 +32,6 @@ from rnaconsnake.tools.dereplicate import candidates_from_records, cluster_candi
 from rnaconsnake.tools.loci import collapse_ratio, parse_window_name
 from rnaconsnake.workflow_helpers import REAL_ARM, arm_class, write_json
 
-
 FUNNEL_STAGES = ["windows", "loci", "rnaz", "alifoldz", "rscape", "cascade"]
 
 FUNNEL_COLUMNS = ["arm_class", "arm", "wlen", "stage", "n_in", "n_out"]
@@ -206,11 +205,7 @@ def rscape_was_evaluated(loci_by_arm: dict[str, list[LocusRecord]]) -> bool:
     R-scape filter in the cascade would zero the headline number for reasons
     that have nothing to do with the data.
     """
-    return any(
-        locus.rep.rscape is not None
-        for loci in loci_by_arm.values()
-        for locus in loci
-    )
+    return any(locus.rep.rscape is not None for loci in loci_by_arm.values() for locus in loci)
 
 
 def funnel_counts(
@@ -263,8 +258,7 @@ def empirical_fdr(
             fdr[threshold] = 1.0
             continue
         null_counts = [
-            sum(1 for value in replicate if value >= threshold)
-            for replicate in null_scores_per_replicate
+            sum(1 for value in replicate if value >= threshold) for replicate in null_scores_per_replicate
         ]
         mean_null = statistics.fmean(null_counts) if null_counts else 0.0
         fdr[threshold] = min(1.0, max(0.0, mean_null / n_real))
@@ -362,9 +356,7 @@ def calibrate(
     # way in both arms, otherwise the null count inflates and the FDR is wrong
     # in the flattering direction.
     real_ratio = collapse_ratio(windows_by_arm[REAL_ARM], len(loci_by_arm[REAL_ARM]))
-    null_ratios = [
-        collapse_ratio(windows_by_arm[arm], len(loci_by_arm[arm])) for arm in null_arms
-    ]
+    null_ratios = [collapse_ratio(windows_by_arm[arm], len(loci_by_arm[arm])) for arm in null_arms]
     mean_null_ratio = statistics.fmean(null_ratios) if null_ratios else 0.0
     if real_ratio > 0:
         deviation = abs(mean_null_ratio / real_ratio - 1.0)
@@ -383,16 +375,10 @@ def calibrate(
     fdr_tables: dict[str, dict[float, float]] = {}
     for score in ["rnaz_prob", "alifoldz"]:
         real_values = [
-            value
-            for value in (locus.oriented(score) for locus in loci_by_arm[REAL_ARM])
-            if value is not None
+            value for value in (locus.oriented(score) for locus in loci_by_arm[REAL_ARM]) if value is not None
         ]
         null_values = [
-            [
-                value
-                for value in (locus.oriented(score) for locus in loci_by_arm[arm])
-                if value is not None
-            ]
+            [value for value in (locus.oriented(score) for locus in loci_by_arm[arm]) if value is not None]
             for arm in null_arms
         ]
         fdr_tables[score] = empirical_fdr(real_values, null_values)
@@ -401,8 +387,7 @@ def calibrate(
     # --- composite cascade ------------------------------------------------------
     real_cascade = cascade_survivors(loci_by_arm[REAL_ARM], thresholds, include_rscape)
     null_cascade_counts = [
-        len(cascade_survivors(loci_by_arm[arm], thresholds, include_rscape))
-        for arm in null_arms
+        len(cascade_survivors(loci_by_arm[arm], thresholds, include_rscape)) for arm in null_arms
     ]
     mean_null_cascade = statistics.fmean(null_cascade_counts) if null_cascade_counts else 0.0
     cascade_fdr: float | None
@@ -467,9 +452,7 @@ def calibrate(
             rnaz_score = locus.oriented("rnaz_prob")
             alifoldz_score = locus.oriented("alifoldz")
             q_rnaz = envelopes["rnaz_prob"].get(rnaz_score) if rnaz_score is not None else None
-            q_alifoldz = (
-                envelopes["alifoldz"].get(alifoldz_score) if alifoldz_score is not None else None
-            )
+            q_alifoldz = envelopes["alifoldz"].get(alifoldz_score) if alifoldz_score is not None else None
             in_cascade = locus.locus_id in cascade_ids
             writer.writerow(
                 [
@@ -504,9 +487,7 @@ def calibrate(
                 ]:
                     if raw is None:
                         continue
-                    writer.writerow(
-                        [arm, locus.wlen, locus.locus_id, locus.start, locus.end, score, raw]
-                    )
+                    writer.writerow([arm, locus.wlen, locus.locus_id, locus.start, locus.end, score, raw])
 
     summary = {
         "null": {
