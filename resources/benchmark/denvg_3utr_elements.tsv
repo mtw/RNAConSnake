@@ -1,0 +1,23 @@
+# DENVG 3'UTR benchmark truth file - HELD-OUT TEST SET.
+#
+# curated 2026-08-24 by M. Wolfinger. 4/4 labelled.
+#
+# The screen configuration was locked on the JEV group BEFORE these labels
+# were used; see docs/configuration_lock.md. This set is evaluated once and
+# not tuned against.
+#
+# Coordinates are 1-based inclusive columns of
+# examples/all_DENVG_3UTR.relabel.stk (4 RefSeq serotypes, MPI 0.71).
+#
+# EXCLUDED, deliberately: scaffold domains 45-103, 133-148 and 149-166 were
+# examined and are not xrRNAs, though they may overlap the endogenous xrRNAs.
+# They are omitted rather than labelled uncertainly - an unbelieved row would
+# inflate recovery. The 18 nt hairpin at 181-198, split off the same scaffold
+# domain as DB1, is likewise unassigned.
+#
+# No xrRNA is included: the mLocARNA consensus does not resolve them here.
+element_id	element_class	alignment	start	end	notes
+DB1	DB	denvg_3utr	211	278	dumbbell 1; confirmed by curator from the alignment and RNAalifold fold. Recovered by splitting the 131 nt scaffold domain 167-297 at finer granularity
+DB2	DB	denvg_3utr	303	371	dumbbell 2; confirmed by curator
+sHP	sHP	denvg_3utr	396	409	small hairpin 5' of the terminal 3'SL; confirmed by curator. Missed by the scaffold defaults (14 nt, below --min-width 15)
+3SL	3SL	denvg_3utr	410	488	terminal 3' stem-loop; confirmed by curator

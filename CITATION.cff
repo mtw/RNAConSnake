@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "RNAcs (RNAConSnake)"
+abstract: >-
+  Workflow for discovering and prioritizing locally conserved RNA secondary
+  structure candidates from multiple sequence alignments, with a null-model
+  calibration arm that attaches empirical FDR / q-values to every candidate.
+type: software
+authors:
+  - family-names: Wolfinger
+    given-names: "Michael T."
+# TODO before minting the Zenodo DOI: update to the RNA Forecast organisation URL,
+# and add each author's ORCID.
+repository-code: "https://github.com/mtw/RNAConSnake"
+license: AGPL-3.0-or-later
+version: 0.3.0
+references:
+  - type: article
+    title: "Statistical evaluation of improved sequence-structure alignments"
+    authors:
+      - family-names: Gesell
+        given-names: Tanja
+      - family-names: Washietl
+        given-names: Stefan
+    journal: "BMC Bioinformatics"
+    year: 2008
+    notes: "SISSIz, the null-model simulation method used by the calibration arm."
+  - type: article
+    title: >-
+      Functional RNA structures in the 3'UTR of tick-borne, insect-specific and
+      no-known-vector flaviviruses
+    authors:
+      - family-names: Ochsenreiter
+        given-names: Roman
+      - family-names: Hofacker
+        given-names: "Ivo L."
+      - family-names: Wolfinger
+        given-names: "Michael T."
+    journal: Viruses
+    year: 2019
+    notes: "Source of the flavivirus positive-control benchmark set."

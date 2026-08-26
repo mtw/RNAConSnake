@@ -2,3 +2,7 @@ include snakefile
 include config.yaml
 include LICENSE
 include README.md
+include CITATION.cff
+include environment.yaml
+recursive-include resources *
+recursive-include profiles *

@@ -15,6 +15,80 @@ rnaz_no_shuffle: true
 cm_rnaz_prob_threshold: 0.9
 cm_alifoldz_threshold: -2.0
 
+# Null-model calibration arm.
+#
+# method: none (the shipped default) keeps the pre-calibration behaviour and
+# output layout byte-for-byte.  Turning the arm on moves every pipeline output
+# under arms/<arm>/ and adds results/calibration/.  sissiz is the method the
+# manuscript reports; rnazRandomizeAln is faster, weaker, and used for CI.
+#
+# NOTE: the key is quoted on purpose. An unquoted "null:" is the YAML null
+# scalar, so the whole section would silently land under a None key.
+"null":
+  method: none            # sissiz | rnazRandomizeAln | none
+  replicates: 10          # 10 = order-of-magnitude sanity check, 100 = usable q-values
+  seed: 20261101
+  two_stage: true         # AlifoldZ only on stage-one survivors (FDR becomes conditional)
+  # SISSIz exposes no seed and draws its own from the clock, so null.seed does
+  # NOT reproduce a sissiz pool. To reproduce a calibration, pin the pool that
+  # produced it: pool_file: /path/to/null_pool/pool.stk
+  pool_file:
+
+# Filter thresholds used when turning arm counts into q-values. The defaults
+# mirror the cm_* thresholds so the calibrated cascade matches the screen.
+calibration:
+  # Locked 2026-08-23 on the JEV group, before the dengue group was evaluated;
+  # see docs/configuration_lock.md. Do not tune against DENVG results.
+  rnaz_prob_threshold: 0.8
+  alifoldz_threshold: -1.5
+  rscape_min_pairs: 1
+  stage1_rnaz_prob: 0.5      # must be <= rnaz_prob_threshold
+  locus_min_overlap: 1       # columns of overlap required to merge two windows
+  collapse_ratio_tolerance: 0.2
+
+# De-replication of overlapping RNALalifold windows.
+#
+# RNALalifold reports every locally stable structure, so one real element comes
+# back many times over: once near its true extent, and again as shorter windows
+# covering its individual helices. Those fragments score well too. Collapsing
+# them yields one representative per locus in RNAConSnake.nr.csv, and is the
+# counting unit the null-model calibration uses.
+#
+#   containment  - a window nested inside another is a fragment of it (default)
+#   substructure - stricter: its consensus base pairs must also be a subset
+#   overlap      - classic RNAz-style locus merge on any shared column; chains
+#   none         - report every window
+dereplicate:
+  method: containment
+  # How a locus picks the window representing it. "widest" is the only rule
+  # that does not select on a score the cascade then thresholds on, so the
+  # reported scores are not max-of-N statistics. See docs/dereplication.md.
+  representative: widest
+  pair_containment: 0.9      # substructure method only
+  # RNALalifold also reports long windows that span several genuinely distinct
+  # elements. A window wider than this may not absorb narrow ones -- otherwise
+  # one 200 nt window swallows three 60 nt hairpins and reports a single locus.
+  # Set it to the largest element you expect (flavivirus 3'SL and xrRNAs are
+  # ~70-100 nt); 0 disables the guard.
+  max_container_width: 120
+  # A wider window may still absorb one covering at least this fraction of it,
+  # so near-duplicate long windows collapse into each other rather than each
+  # becoming its own locus.
+  container_min_coverage: 0.8
+
+# Positive control (see resources/benchmark/README.md). Not built by default.
+benchmark_truth: resources/benchmark/flavivirus_elements.tsv
+benchmark_min_overlap_fraction: 0.5
+benchmark_allow_uncurated: false
+
+# alifoldz.pl estimates its z-score from 100 internal shuffles and has no seed
+# option, so its scores - and therefore any q-value derived from them - vary
+# between runs. Setting a seed pins Perl's RNG per candidate and makes a run
+# reproducible. Set to null for the historical unseeded behaviour.
+alifoldz_seed: 20261101
+
+emit_versions: false
+
 tools:
   rnalalifold: RNALalifold
   remove_gaponly: python3 -m rnaconsnake.tools.remove_gaponly
@@ -23,6 +97,16 @@ tools:
   eslreformat: esl-reformat
   rnaz: RNAz
   alifoldz: alifoldz.pl
+  sissiz: SISSIz
+  rnaz_randomize_aln: rnazRandomizeAln.pl
+  null_model: python3 -m rnaconsnake.tools.null_model
+  calibration: python3 -m rnaconsnake.tools.calibration
+  benchmark: python3 -m rnaconsnake.tools.benchmark
+  dereplicate: python3 -m rnaconsnake.tools.dereplicate
+  alignment_report: python3 -m rnaconsnake.tools.alignment_report
+  benchmark_scaffold: python3 -m rnaconsnake.tools.benchmark_scaffold
+  threshold_sweep: python3 -m rnaconsnake.tools.threshold_sweep
+  versions: python3 -m rnaconsnake.tools.versions
   rnaalifold: RNAalifold
   ps2eps: ps2eps
   epstopdf: epstopdf

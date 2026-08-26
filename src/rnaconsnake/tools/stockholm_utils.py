@@ -44,7 +44,7 @@ def parse_stockholm_records(path: str | Path) -> list[StockholmRecord]:
                 current["gf_lines"].append(line)
                 continue
             if line.startswith("#=GC "):
-                current["gc_lines"].append(line)
+                _append_gc(current, line)
                 continue
             if line.startswith("#=GS "):
                 parts = line.split(None, 2)
@@ -65,7 +65,10 @@ def parse_stockholm_records(path: str | Path) -> list[StockholmRecord]:
             name, seq = _split_seq_line(line)
             if name not in current["seqs"]:
                 current["seq_order"].append(name)
-            current["seqs"][name] = seq
+                current["seqs"][name] = seq
+            else:
+                # Interleaved Stockholm repeats each name once per block.
+                current["seqs"][name] += seq
 
     if current["seq_order"] or current["gf_lines"] or current["gc_lines"] or current["other_lines"]:
         records.append(_record_from_parts(current))
@@ -109,6 +112,21 @@ def subset_record(record: StockholmRecord, keep_names: list[str]) -> StockholmRe
         gr_lines=[item for item in record.gr_lines if item[0] in keep],
         other_lines=list(record.other_lines),
     )
+
+
+def _append_gc(current: dict, line: str) -> None:
+    """Merge ``#=GC`` annotation across interleaved blocks, by tag."""
+    parts = line.split(None, 2)
+    if len(parts) != 3:
+        current["gc_lines"].append(line)
+        return
+    tag, chunk = parts[1], parts[2]
+    for index, existing in enumerate(current["gc_lines"]):
+        existing_parts = existing.split(None, 2)
+        if len(existing_parts) == 3 and existing_parts[1] == tag:
+            current["gc_lines"][index] = f"#=GC {tag} {existing_parts[2]}{chunk}"
+            return
+    current["gc_lines"].append(line)
 
 
 def _new_record() -> dict:

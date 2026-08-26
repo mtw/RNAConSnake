@@ -36,8 +36,14 @@ DEFAULT_RUNTIME_DEPENDENCIES = [
 ]
 
 
+PROGRAM_NAME = "RNAcs"
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the packaged RNAConSnake Snakemake workflow.")
+    parser = argparse.ArgumentParser(
+        prog=PROGRAM_NAME,
+        description="Run the packaged RNAConSnake Snakemake workflow.",
+    )
     parser.add_argument("--cores", default="all", help="Snakemake cores value, e.g. 4 or all")
     parser.add_argument("--latency-wait", default="20", help="Snakemake latency wait")
     parser.add_argument("--snakefile", help="Override packaged snakefile path")
@@ -99,6 +105,61 @@ def parse_args() -> argparse.Namespace:
         help="Optional dataset/feature description for the export bundle.",
     )
     parser.add_argument(
+        "--null-arm",
+        nargs="?",
+        const="sissiz",
+        choices=["sissiz", "rnazRandomizeAln", "none"],
+        help=(
+            "Enable the null-model calibration arm. Bare --null-arm uses SISSIz, the method "
+            "the manuscript reports. Every pipeline output then moves under arms/<arm>/ and "
+            "results/calibration/ is produced."
+        ),
+    )
+    parser.add_argument(
+        "--null-replicates",
+        type=int,
+        help="Number of null replicates (10 = sanity check, 100 = usable q-values).",
+    )
+    parser.add_argument(
+        "--null-seed",
+        type=int,
+        help="Base seed for null replicate generation.",
+    )
+    parser.add_argument(
+        "--null-pool",
+        help=(
+            "Reuse a previously generated null_pool/pool.stk instead of simulating new "
+            "replicates. SISSIz cannot be seeded, so pinning the pool is how a "
+            "calibration is reproduced."
+        ),
+    )
+    parser.add_argument(
+        "--no-two-stage",
+        action="store_true",
+        help=(
+            "Run AlifoldZ on every candidate instead of only on stage-one survivors. "
+            "Much slower, but the resulting FDR is unconditional."
+        ),
+    )
+    parser.add_argument(
+        "--dereplicate",
+        choices=["containment", "substructure", "overlap", "none"],
+        help=(
+            "How to collapse overlapping RNALalifold windows into one candidate per locus. "
+            "Default: containment (a window nested inside another is a fragment of it)."
+        ),
+    )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Also build the flavivirus positive-control recovery table (needs a curated truth file).",
+    )
+    parser.add_argument(
+        "--emit-versions",
+        action="store_true",
+        help="Write results/versions.yaml recording the toolchain used for this run.",
+    )
+    parser.add_argument(
         "--conservative",
         action="store_true",
         help="Trust existing outputs more conservatively by only rerunning on mtime-based staleness.",
@@ -124,10 +185,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def check_dependencies(include_rscape: bool = False) -> int:
+NULL_METHOD_DEPENDENCIES = {
+    "sissiz": "SISSIz",
+    "rnazRandomizeAln": "rnazRandomizeAln.pl",
+}
+
+
+def check_dependencies(include_rscape: bool = False, null_method: str | None = None) -> int:
     dependencies = list(DEFAULT_RUNTIME_DEPENDENCIES)
     if include_rscape:
         dependencies.append("R-scape")
+    if null_method in NULL_METHOD_DEPENDENCIES:
+        dependencies.append(NULL_METHOD_DEPENDENCIES[null_method])
     missing: list[str] = []
     for dep in dependencies:
         if shutil.which(dep) is None:
@@ -182,6 +251,13 @@ def show_tool_paths(configfile: str, include_rscape: bool) -> int:
         "magick",
         "cmbuild",
         "cmcalibrate",
+        "sissiz",
+        "rnaz_randomize_aln",
+        "null_model",
+        "calibration",
+        "benchmark",
+        "dereplicate",
+        "versions",
     ]
     if include_rscape:
         tool_names.append("rscape")
@@ -203,6 +279,13 @@ def show_tool_paths(configfile: str, include_rscape: bool) -> int:
         "cmbuild": "cmbuild",
         "cmcalibrate": "cmcalibrate",
         "rscape": "R-scape",
+        "sissiz": "SISSIz",
+        "rnaz_randomize_aln": "rnazRandomizeAln.pl",
+        "null_model": "python3 -m rnaconsnake.tools.null_model",
+        "calibration": "python3 -m rnaconsnake.tools.calibration",
+        "benchmark": "python3 -m rnaconsnake.tools.benchmark",
+        "dereplicate": "python3 -m rnaconsnake.tools.dereplicate",
+        "versions": "python3 -m rnaconsnake.tools.versions",
     }
 
     print(f"Tool resolution using config: {Path(configfile).resolve()}")
@@ -216,6 +299,84 @@ def show_tool_paths(configfile: str, include_rscape: bool) -> int:
         print(f"  command: {command}")
         print(f"  executable: {resolved_text}")
     return 0
+
+
+def split_passthrough_config(passthrough: list[str]) -> tuple[list[str], list[str]]:
+    """Pull ``--config`` entries out of the passthrough arguments.
+
+    Snakemake's ``--config`` takes ``nargs="+"``, so argparse keeps only the
+    last occurrence. Emitting our own ``--config`` alongside the user's would
+    silently drop theirs, so both sets are merged into a single option.
+    """
+    rest: list[str] = []
+    entries: list[str] = []
+    index = 0
+    while index < len(passthrough):
+        arg = passthrough[index]
+        if arg not in {"--config", "-C"}:
+            rest.append(arg)
+            index += 1
+            continue
+        index += 1
+        while index < len(passthrough) and not passthrough[index].startswith("-"):
+            entries.append(passthrough[index])
+            index += 1
+    return rest, entries
+
+
+def load_config_section(configfile: str, key: str) -> dict:
+    config_path = Path(configfile)
+    if not config_path.is_file():
+        return {}
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    # An unquoted ``null:`` key in YAML parses as the null scalar.
+    section = payload.get(key)
+    if section is None and key == "null":
+        section = payload.get(None)
+    return dict(section or {})
+
+
+def resolve_null_config(args: argparse.Namespace, configfile: str) -> dict | None:
+    """Merge the null-arm CLI options over the configured defaults.
+
+    Returns ``None`` when no null-arm option was given, so the config file is
+    left untouched and a plain run keeps its current behaviour.
+    """
+    requested = [
+        args.null_arm,
+        args.null_replicates,
+        args.null_seed,
+        args.no_two_stage,
+        args.null_pool,
+    ]
+    if not any(value not in (None, False) for value in requested):
+        return None
+
+    resolved = {
+        "method": "none",
+        "replicates": 10,
+        "seed": 20261101,
+        "two_stage": True,
+    }
+    resolved.update(load_config_section(configfile, "null"))
+    if args.null_arm is not None:
+        resolved["method"] = args.null_arm
+    elif resolved["method"] == "none":
+        # --null-replicates/--null-seed on their own still mean "calibrate".
+        resolved["method"] = "sissiz"
+    if args.null_replicates is not None:
+        resolved["replicates"] = args.null_replicates
+    if args.null_seed is not None:
+        resolved["seed"] = args.null_seed
+    if args.no_two_stage:
+        resolved["two_stage"] = False
+    if args.null_pool:
+        resolved["pool_file"] = str(Path(args.null_pool).resolve())
+    # Snakemake stringifies nested --config values, so an empty pool_file would
+    # arrive as the literal "None". Omit the key instead.
+    if not resolved.get("pool_file"):
+        resolved.pop("pool_file", None)
+    return resolved
 
 
 def resolve_workflow_paths(snakefile_override: str | None) -> tuple[str, str]:
@@ -343,18 +504,20 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
 def main() -> int:
     args = parse_args()
     if args.version:
-        print(f"rnaconsnake {__version__}")
+        print(f"{PROGRAM_NAME} {__version__}")
         return 0
     snakefile, default_configfile = resolve_workflow_paths(args.snakefile)
     configfile = extract_configfile_arg(args.snakemake_args) or default_configfile
     if args.show_tool_paths:
         return show_tool_paths(configfile=configfile, include_rscape=args.rscape)
+    null_config = resolve_null_config(args, configfile)
+    null_method = null_config["method"] if null_config else None
     if args.check_deps:
-        return check_dependencies(include_rscape=args.rscape)
+        return check_dependencies(include_rscape=args.rscape, null_method=null_method)
     if not args.input_alignment:
         print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
         return 2
-    dep_status = check_dependencies(include_rscape=args.rscape)
+    dep_status = check_dependencies(include_rscape=args.rscape, null_method=null_method)
     if dep_status != 0:
         return dep_status
 
@@ -374,22 +537,37 @@ def main() -> int:
         "--latency-wait",
         str(args.latency_wait),
     ]
+    if args.benchmark:
+        # Positional targets have to come before any nargs="+" option, ours or
+        # the user's, or argparse swallows them as malformed --config entries.
+        cmd.append("results/benchmark/flavivirus_recovery.tsv")
     if args.output_dir:
         cmd.extend(["--directory", str(Path(args.output_dir).resolve())])
     if args.conservative:
         cmd.extend(["--rerun-triggers", "mtime"])
+    passthrough_config: list[str] = []
     if args.snakemake_args:
         passthrough = args.snakemake_args
         if passthrough and passthrough[0] == "--":
             passthrough = passthrough[1:]
+        passthrough, passthrough_config = split_passthrough_config(passthrough)
         cmd.extend(passthrough)
-    config_overrides = [f"input_alignment={Path(args.input_alignment).resolve()}"]
+    # The user's entries come first so that explicit RNAcs flags win.
+    config_overrides = [*passthrough_config, f"input_alignment={Path(args.input_alignment).resolve()}"]
     if args.maxbpspan:
         config_overrides.append(f"maxbpspan=[{','.join(str(value) for value in args.maxbpspan)}]")
     if args.rscape:
         config_overrides.append("do_rscape=True")
     if args.rnaz_shuffle:
         config_overrides.append("rnaz_no_shuffle=False")
+    if null_config is not None:
+        # Snakemake replaces a --config key wholesale rather than merging, so
+        # the whole section is passed at once.
+        config_overrides.append("null=" + repr(null_config))
+    if args.dereplicate:
+        config_overrides.append("dereplicate=" + repr({"method": args.dereplicate}))
+    if args.emit_versions:
+        config_overrides.append("emit_versions=True")
     cmd.extend(["--config", *config_overrides])
     if "--configfile" not in cmd and "--configfiles" not in cmd:
         cmd.extend(["--configfile", default_configfile])

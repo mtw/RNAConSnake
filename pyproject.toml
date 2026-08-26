@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rnaconsnake"
-version = "0.2.0"
+version = "0.3.0"
 description = "Workflow for discovering and prioritizing locally conserved RNA secondary structure candidates"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ dev = [
 ]
 
 [project.scripts]
+RNAcs = "rnaconsnake.cli:main"
 rnaconsnake-run = "rnaconsnake.cli:main"
 rnaconsnake-split-stockholm = "rnaconsnake.tools.split_stockholm:main"
 rnaconsnake-remove-gaponly = "rnaconsnake.tools.remove_gaponly:main"
@@ -37,7 +38,11 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-rnaconsnake = ["workflow/snakefile", "workflow/config.yaml"]
+rnaconsnake = [
+  "workflow/snakefile",
+  "workflow/config.yaml",
+  "resources/benchmark/*",
+]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -1,0 +1,22 @@
+# JEVG 3'UTR benchmark truth file.
+#
+# curation status: 9/9 labelled - COMPLETE.
+#
+# Coordinates are 1-based inclusive alignment columns of
+# examples/all_JEVG_3UTR.relabel.stk. Curated by M. Wolfinger against the
+# domain-span folds in jevg_benchmark_review/.
+#
+# HP1 and HP2 were not previously annotated.
+# xrRNA1 and xrRNA2 form pseudoknots that the ViennaRNA model cannot
+# represent, so both fold as two hairpins and score worse than their true
+# structure warrants. See the xrRNA1 note.
+element_id	element_class	alignment	start	end	notes
+xrRNA1	xrRNA	jevg_3utr	158	219	region_01+region_02 merged | three-way junction with a pseudoknot to ~210-219; ViennaRNA cannot represent pseudoknots, so it folds as two hairpins. Truncating at 209 recovers the 3-way junction (see xrRNA1_final/)
+HP1	hairpin	jevg_3utr	220	234	region_03_220-234/ | small hairpin immediately 3' of xrRNA1; NOT PREVIOUSLY ANNOTATED
+SL-III	SL	jevg_3utr	243	317	region_04_243-317/ | stem-loop III
+xrRNA2	xrRNA	jevg_3utr	327	376	region_05_327-376/ | xrRNA2
+HP2	hairpin	jevg_3utr	386	400	region_06_386-400/ | small hairpin immediately 3' of xrRNA2; NOT PREVIOUSLY ANNOTATED
+DB1	DB	jevg_3utr	425	497	region_07_425-497/ | confirmed by curator from the domain-span fold
+DB2	DB	jevg_3utr	508	576	region_08_508-576/ | confirmed by curator from the domain-span fold
+sHP	sHP	jevg_3utr	610	627	region_09_610-627/ | small hairpin 5' of the terminal 3'SL
+3SL	3SL	jevg_3utr	628	711	region_10_628-711/ | terminal 3' stem-loop

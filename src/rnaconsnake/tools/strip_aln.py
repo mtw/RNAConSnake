@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 
-from rnaconsnake.tools.stockholm_utils import iter_stockholm_lines, parse_stockholm_records, subset_record
+from rnaconsnake.tools.stockholm_utils import (
+    StockholmRecord,
+    iter_stockholm_lines,
+    parse_stockholm_records,
+    subset_record,
+)
 
 
 FORMAT_MAP = {
@@ -16,6 +22,22 @@ FORMAT_MAP = {
 }
 
 VERSION = "0.2"
+
+
+def _uppercase_sequences(record: StockholmRecord) -> StockholmRecord:
+    r"""Upper-case residues, leaving names and annotation lines untouched.
+
+    This is the pipeline's one canonical case-normalisation point. The external
+    toolchain does not agree about case: ``alifoldz.pl`` matches alignment rows
+    with ``[A-Z\-.]+`` and ``refold.pl`` with ``[A-Z\-]+``, both without ``/i``,
+    so a lower-case alignment (MAFFT output, for instance) parses as *zero*
+    sequences in either -- while ``RNAz`` and ``RNAalifold`` accept any case.
+    Mixed behaviour like that produces tool-dependent silent corruption, so
+    everything downstream of this step gets upper case.
+
+    ``generated_files/orig/`` still holds the verbatim split alignment.
+    """
+    return replace(record, seqs={name: seq.upper() for name, seq in record.seqs.items()})
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,7 +64,7 @@ def main() -> int:
     if not records:
         return 0
 
-    record = records[0]
+    record = _uppercase_sequences(records[0])
     keep: list[str] = []
     seen: set[str] = set()
     for name in record.seq_order:

@@ -13,6 +13,22 @@ pip install -e .[dev]
 
 This project packages the Python-side workflow logic, but still expects the external RNA analysis toolchain to be installed separately and available on `PATH`.
 
+Three of those tools are on no package index and must be built or copied by
+hand: **SISSIz** (<https://github.com/mtw/SISSIz>), **`alifoldz.pl`** (RNAz
+source tarball) and **`refold.pl`** (ViennaRNA source tarball). The
+[container](../container/README.md) packages all of them and is the least
+painful way to get a complete environment:
+
+```bash
+cd container && ./prepare-context.sh
+docker build --platform linux/arm64 -t rnacs:0.3.0 .
+```
+
+Note that `--use-conda` does **not** work: most rules use Snakemake `run:`
+directives, which execute in the Snakemake process and cannot take per-rule
+conda environments. Use [`environment.yaml`](../environment.yaml) or the
+container instead.
+
 ## Workflow Entry Points
 
 There are two workflow entry points in the repository:
@@ -20,9 +36,9 @@ There are two workflow entry points in the repository:
 - [`snakefile`](../snakefile): workflow source of truth
 - [`config.yaml`](../config.yaml): default workflow config source of truth
 
-The packaged CLI `rnaconsnake-run` invokes workflow files copied from those root files at build time. In editable development installs, the CLI falls back to the root workflow files directly.
+The packaged CLI `RNAcs` invokes workflow files copied from those root files at build time. In editable development installs, the CLI falls back to the root workflow files directly.
 
-For repository-local use without shell-activating a virtual environment, the root launcher [`rnaconsnake-run`](../rnaconsnake-run) executes `python -m rnaconsnake.cli` with `PYTHONPATH=src` and automatically prefers `./.venv/bin/python` when it exists.
+For repository-local use without shell-activating a virtual environment, the root launcher [`RNAcs`](../RNAcs) executes `python -m rnaconsnake.cli` with `PYTHONPATH=src` and automatically prefers `./.venv/bin/python` when it exists.
 
 Important preprocessing knobs in [`config.yaml`](../config.yaml):
 
@@ -38,40 +54,40 @@ Important preprocessing knobs in [`config.yaml`](../config.yaml):
 
 ```bash
 pytest -v
-rnaconsnake-run --input-alignment /path/to/input.stk --output-dir /path/to/run_dir
-rnaconsnake-run --check-deps
-rnaconsnake-run --version
+RNAcs --input-alignment /path/to/input.stk --output-dir /path/to/run_dir
+RNAcs --check-deps
+RNAcs --version
 ```
 
 Example CLI override for window sizes:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/input.stk --maxbpspan 150 --maxbpspan 250 --cores all
+RNAcs --input-alignment /path/to/input.stk --maxbpspan 150 --maxbpspan 250 --cores all
 ```
 
 Optional `R-scape` branch:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/input.stk --rscape --cores all
-rnaconsnake-run --check-deps --rscape
+RNAcs --input-alignment /path/to/input.stk --rscape --cores all
+RNAcs --check-deps --rscape
 ```
 
 RNAz defaults to `-d -n`, so alignment shuffling is disabled unless explicitly requested. To allow shuffling for a run:
 
 ```bash
-rnaconsnake-run --input-alignment /path/to/input.stk --rnaz-shuffle --cores all
+RNAcs --input-alignment /path/to/input.stk --rnaz-shuffle --cores all
 ```
 
 To inspect which external tool commands RNAConSnake is configured to use, and where their executables resolve on the current machine, run:
 
 ```bash
-rnaconsnake-run --show-tool-paths
+RNAcs --show-tool-paths
 ```
 
 Structured export can be triggered from the main CLI after a successful workflow run:
 
 ```bash
-rnaconsnake-run \
+RNAcs \
   --input-alignment /path/to/input.stk \
   --output-dir /path/to/run_dir \
   --export-bundle /path/to/export_bundle \
@@ -106,6 +122,33 @@ It deliberately does not compare stochastic downstream metrics such as `alifoldz
 
 RNAConSnake should remain the scientific computation and export layer only. Any future HTML browser UI should remain outside the scope of this repository.
 
+## Tool inventory
+
+Everything under `src/rnaconsnake/tools/` is a standalone module with a `main()`,
+runnable as `python -m rnaconsnake.tools.<name>`.
+
+| module | role |
+| --- | --- |
+| `split_stockholm`, `remove_gaponly`, `strip_aln` | candidate preprocessing |
+| `legacy_postprocess`, `alifold_maxcovar` | metric extraction, summary rendering |
+| `stockholm_utils`, `alignment_io` | Stockholm/Clustal parsing, composition diagnostics |
+| `null_model` | null-alignment generation (SISSIz, rnazRandomizeAln), pool pinning |
+| `loci` | alignment-coordinate primitives |
+| `dereplicate` | grouping overlapping windows into loci; representative selection |
+| `calibration` | empirical FDR, q-values, filter funnel |
+| `benchmark` | recovery scoring against a curated truth file, with null baseline |
+| `benchmark_scaffold` | drafts a truth file from an `#=GC SS_cons` reference |
+| `fold_region` | folds and plots an arbitrary alignment span |
+| `alignment_report` | per-window screenability: where the screen is blind |
+| `threshold_sweep` | cascade thresholds vs FDR, reusing a calibrated run |
+| `sensitivity_envelope` | alignment subsets for measuring the detection floor |
+| `versions` | toolchain provenance (`results/versions.yaml`) |
+| `verify_run_consistency` | compares two completed runs |
+
+Two are analysis aids rather than pipeline steps, and are not wired into the
+DAG: `fold_region` and `sensitivity_envelope`. `threshold_sweep` likewise runs
+against a finished calibration.
+
 ## Shipping Model
 
 Current release model:
@@ -119,3 +162,44 @@ Planned future direction:
 
 - loosen the hard external dependency on `RNALalifold`
 - evaluate wrapping ViennaRNA Python bindings directly from Python
+
+## Null-model calibration arm
+
+The calibration arm adds an `{arm}` dimension over the whole pipeline. The
+invariant that makes it valid is that **both arms traverse the same rule DAG**,
+so the code is structured to make divergence unrepresentable rather than merely
+discouraged:
+
+- Rules never hardcode an output prefix. They call `A(path)`, which prepends
+  `arms/{arm}/`, or the empty string when the arm is disabled.
+- `CandidatePaths` carries the same `arm_prefix`, so the Python body of a rule
+  cannot drift from its declared outputs.
+- Checkpoint lookups go through `checkpoint_wildcards()`, which adds the `arm`
+  wildcard only when the arm is enabled.
+
+If you add a rule downstream of `make_arm_alignment`, wrap its paths in `A()`
+and take its `CandidatePaths` from `paths_for(wildcards)`. Do not add an
+arm-specific variant of an existing rule; `tests/test_python_tools.py` asserts
+that no rule name or rule body is duplicated.
+
+Behaviour when the arm is disabled (`null.method: none`, the default) must stay
+byte-identical to the pre-calibration pipeline. Verify with:
+
+```bash
+python -m rnaconsnake.tools.verify_run_consistency /path/to/run_a /path/to/run_b
+```
+
+Note that a plain `diff -r` between any two runs is expected to show
+differences in `alifoldz` outputs (the tool shuffles internally) and in
+PostScript/PDF/PNG artifacts (embedded `%%CreationDate`). Compare a run of the
+changed code against *two* runs of the unchanged code before concluding that a
+difference is yours.
+
+The fast feedback loop for the arm is the CI toy target:
+
+```bash
+pytest -v -k null_arm_smoke
+```
+
+It runs the whole DAG, including two null replicates, against fake external
+tools, and asserts that `funnel.tsv` has one row per filter stage per arm.

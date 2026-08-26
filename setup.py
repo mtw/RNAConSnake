@@ -9,9 +9,14 @@ from setuptools.command.build_py import build_py as _build_py
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_WORKFLOW_DIR = Path("rnaconsnake") / "workflow"
+PACKAGE_RESOURCES_DIR = Path("rnaconsnake") / "resources"
 WORKFLOW_SOURCES = {
     ROOT / "snakefile": PACKAGE_WORKFLOW_DIR / "snakefile",
     ROOT / "config.yaml": PACKAGE_WORKFLOW_DIR / "config.yaml",
+    ROOT / "resources" / "benchmark" / "flavivirus_elements.tsv":
+        PACKAGE_RESOURCES_DIR / "benchmark" / "flavivirus_elements.tsv",
+    ROOT / "resources" / "benchmark" / "README.md":
+        PACKAGE_RESOURCES_DIR / "benchmark" / "README.md",
 }
 
 

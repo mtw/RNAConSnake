@@ -33,17 +33,22 @@ jobs:
       - name: Check CLI version
         run: |
           . .venv/bin/activate
+          RNAcs --version
+
+      - name: Check deprecated alias still works
+        run: |
+          . .venv/bin/activate
           rnaconsnake-run --version
 
       - name: Check tool-path diagnostic
         run: |
           . .venv/bin/activate
-          rnaconsnake-run --show-tool-paths
+          RNAcs --show-tool-paths
 
       - name: Check dependency reporting
         run: |
           . .venv/bin/activate
-          if rnaconsnake-run --check-deps; then
+          if RNAcs --check-deps; then
             echo "Expected missing RNALalifold in CI"
             exit 1
           fi
@@ -81,17 +86,17 @@ jobs:
       - name: Smoke test installed CLI
         run: |
           . .venv/bin/activate
-          rnaconsnake-run --version
+          RNAcs --version
 
       - name: Smoke test installed tool-path diagnostic
         run: |
           . .venv/bin/activate
-          rnaconsnake-run --show-tool-paths
+          RNAcs --show-tool-paths
 
       - name: Check dependency reporting from installed CLI
         run: |
           . .venv/bin/activate
-          if rnaconsnake-run --check-deps; then
+          if RNAcs --check-deps; then
             echo "Expected missing RNALalifold in CI"
             exit 1
           fi

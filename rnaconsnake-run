@@ -1,15 +1,7 @@
 #!/bin/bash
+# Deprecated alias for ./RNAcs, kept so existing scripts keep working.
 set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-
-if [ -x "$repo_root/.venv/bin/python" ]; then
-  python_bin="$repo_root/.venv/bin/python"
-else
-  python_bin="${PYTHON:-python3}"
-fi
-
-export PYTHONPATH="$repo_root/src${PYTHONPATH:+:$PYTHONPATH}"
-export PYTHONWARNINGS='ignore:invalid escape sequence:SyntaxWarning'
-
-exec "$python_bin" -m rnaconsnake.cli "$@"
+echo "rnaconsnake-run is deprecated; use ./RNAcs instead." >&2
+exec "$repo_root/RNAcs" "$@"

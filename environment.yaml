@@ -1,0 +1,32 @@
+# Full RNAcs toolchain, including the null-model calibration arm.
+#
+#   conda env create -f environment.yaml
+#   conda activate rnacs
+#   pip install -e .
+#   RNAcs --check-deps
+#
+# Note on --use-conda: most RNAConSnake rules use Snakemake `run:` directives,
+# which execute in the Snakemake process itself and therefore cannot be given
+# per-rule conda environments. Use this single environment (or a container
+# built from it) instead; `--use-conda` has nothing to attach to.
+name: rnacs
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python >=3.10
+  - pip
+  - snakemake >=8,<10
+  - viennarna =2.7.2
+  - rnaz =2.1
+  # SISSIz is not on any conda channel; build from https://github.com/mtw/SISSIz
+  # - sissiz  (see container/README.md, or install manually)
+  - infernal =1.1.5
+  - r-scape =2.5.9
+  - hmmer
+  - easel
+  - imagemagick
+  - texlive-core            # epstopdf
+  - ps2eps
+  - pip:
+      - tqdm >=4,<5

@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rnaconsnake import __version__
+from rnaconsnake.export_annotations import analysis_root
+from rnaconsnake.export_annotations import collect as collect_annotations
+from rnaconsnake.export_annotations import manifest_block
 from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, read_json, write_json
 
 FEATURE_COLUMNS = [
@@ -23,6 +26,8 @@ FEATURE_COLUMNS = [
     "top_score",
     "covariation_supported_count",
     "rscape_count",
+    "locus_count",
+    "representative_count",
     "summary_md",
     "bundle_path",
     "last_updated",
@@ -49,6 +54,16 @@ CANDIDATE_COLUMNS = [
     "cm_available",
     "rnazprob",
     "alifoldzscore",
+    "locus_id",
+    "locus_start",
+    "locus_end",
+    "locus_window_count",
+    "is_representative",
+    "redundant_to",
+    "q_rnaz",
+    "q_alifoldz",
+    "q_cascade",
+    "cascade_pass",
     "summary_md",
     "notes",
 ]
@@ -70,6 +85,8 @@ ARTIFACT_COLUMNS = [
 ]
 
 CANDIDATE_COORDS = re.compile(r"_aln_(\d+)_(\d+)$")
+
+CALIBRATION_ARTIFACTS = ["funnel.tsv", "qvalues.tsv", "score_dists.tsv", "summary.json"]
 
 
 @dataclass(frozen=True)
@@ -151,6 +168,52 @@ def detect_coords(candidate_id: str) -> tuple[int, int]:
     if not match:
         raise ValueError(f"Could not extract start/end coordinates from candidate id: {candidate_id}")
     return int(match.group(1)), int(match.group(2))
+
+
+def locus_columns(annotations, candidate_id: str) -> dict[str, object]:
+    """De-replication and calibration columns for one candidate.
+
+    Empty strings throughout when a run had neither, so a bundle from an
+    uncalibrated run stays readable by the same consumer.
+    """
+    columns: dict[str, object] = {
+        "locus_id": "",
+        "locus_start": "",
+        "locus_end": "",
+        "locus_window_count": "",
+        "is_representative": "",
+        "redundant_to": "",
+        "q_rnaz": "",
+        "q_alifoldz": "",
+        "q_cascade": "",
+        "cascade_pass": "",
+    }
+    locus = annotations.locus_for(candidate_id)
+    if locus is not None:
+        representative = locus.is_representative(candidate_id)
+        columns.update(
+            {
+                "locus_id": locus.locus_id,
+                "locus_start": locus.locus_start,
+                "locus_end": locus.locus_end,
+                "locus_window_count": locus.window_count,
+                "is_representative": bool_text(representative),
+                # Empty for a representative; otherwise the candidate this one
+                # is a fragment of, so nothing is orphaned.
+                "redundant_to": "" if representative else locus.representative,
+            }
+        )
+    qvalues = annotations.qvalues_for(candidate_id)
+    if qvalues is not None:
+        columns.update(
+            {
+                "q_rnaz": qvalues.q_rnaz,
+                "q_alifoldz": qvalues.q_alifoldz,
+                "q_cascade": qvalues.q_cascade,
+                "cascade_pass": qvalues.cascade_pass,
+            }
+        )
+    return columns
 
 
 def bool_text(value: bool) -> str:
@@ -273,7 +336,11 @@ def build_export(args: argparse.Namespace) -> Path:
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    records = sort_summary_records(discover_summary_records(run_dir))
+    annotations = collect_annotations(run_dir)
+    # With the null-model arm enabled the pipeline outputs live under
+    # arms/real/; without it this is the run directory itself.
+    summary_root = analysis_root(run_dir)
+    records = sort_summary_records(discover_summary_records(summary_root))
     maxbpspans = sorted({record.wlen for record in records})
 
     feature_label_default = Path(args.input_alignment).stem if args.input_alignment else run_dir.name
@@ -322,10 +389,11 @@ def build_export(args: argparse.Namespace) -> Path:
             "summary_md": candidate_summary_rel,
             "notes": "",
         }
+        candidate_row.update(locus_columns(annotations, candidate_id))
 
         source_files = {
             "stockholm_alignment": (
-                run_dir / "Lalifold" / f"len_{record.wlen}" / "split" / f"{candidate_id}.stk",
+                summary_root / "Lalifold" / f"len_{record.wlen}" / "split" / f"{candidate_id}.stk",
                 f"{candidate_bundle_dir}/{candidate_id}.split.stk",
                 "Original split Stockholm alignment",
                 "sto",
@@ -334,7 +402,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 10,
             ),
             "filtered_alignment": (
-                run_dir / "generated_files" / "stk" / f"len_{record.wlen}" / f"{candidate_id}.stk",
+                summary_root / "generated_files" / "stk" / f"len_{record.wlen}" / f"{candidate_id}.stk",
                 f"{candidate_bundle_dir}/{candidate_id}.cleaned.stk",
                 "Filtered cleaned Stockholm alignment",
                 "sto",
@@ -343,7 +411,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 20,
             ),
             "clustal_alignment": (
-                run_dir / "generated_files" / "aln" / f"len_{record.wlen}" / f"{candidate_id}.aln",
+                summary_root / "generated_files" / "aln" / f"len_{record.wlen}" / f"{candidate_id}.aln",
                 f"{candidate_bundle_dir}/{candidate_id}.clustal.aln",
                 "Clustal reformatted alignment",
                 "aln",
@@ -361,7 +429,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 40,
             ),
             "refold_summary": (
-                run_dir / "generated_files" / "refold" / f"len_{record.wlen}" / f"{candidate_id}.refold.json",
+                summary_root / "generated_files" / "refold" / f"len_{record.wlen}" / f"{candidate_id}.refold.json",
                 f"{candidate_bundle_dir}/{candidate_id}.refold.json",
                 "Refold summary",
                 "json",
@@ -370,7 +438,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 50,
             ),
             "alignment_plot_pdf": (
-                run_dir / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_aln.pdf",
+                summary_root / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_aln.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.alignment_plot.pdf",
                 "Alignment plot PDF",
                 "pdf",
@@ -379,7 +447,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 60,
             ),
             "consensus_plot_pdf": (
-                run_dir / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_ss.pdf",
+                summary_root / "generated_files" / "rnaalifold" / f"len_{record.wlen}" / candidate_id / f"{candidate_id}_ss.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.consensus_plot.pdf",
                 "Consensus secondary structure plot PDF",
                 "pdf",
@@ -391,7 +459,7 @@ def build_export(args: argparse.Namespace) -> Path:
 
         optional_files = {
             "rscape_pdf": (
-                run_dir / "generated_files" / "rscape" / f"len_{record.wlen}" / f"{candidate_id}.sto.pdf",
+                summary_root / "generated_files" / "rscape" / f"len_{record.wlen}" / f"{candidate_id}.sto.pdf",
                 f"{candidate_bundle_dir}/{candidate_id}.rscape.pdf",
                 "R-scape covariation PDF",
                 "pdf",
@@ -400,7 +468,7 @@ def build_export(args: argparse.Namespace) -> Path:
                 80,
             ),
             "covariation_table": (
-                run_dir / "generated_files" / "rscape" / f"len_{record.wlen}" / f"{candidate_id}.power",
+                summary_root / "generated_files" / "rscape" / f"len_{record.wlen}" / f"{candidate_id}.power",
                 f"{candidate_bundle_dir}/{candidate_id}.rscape.power",
                 "R-scape power output",
                 "txt",
@@ -450,12 +518,12 @@ def build_export(args: argparse.Namespace) -> Path:
             )
             rscape_available = True
 
-        cm_status_path = run_dir / "generated_files" / "cm" / f"len_{record.wlen}" / f"{candidate_id}.cm.status.json"
+        cm_status_path = summary_root / "generated_files" / "cm" / f"len_{record.wlen}" / f"{candidate_id}.cm.status.json"
         if cm_status_path.is_file():
             cm_status = read_json(cm_status_path)
             cm_relpath = str(cm_status.get("cm", "")).replace("\\", "/")
             if cm_relpath:
-                cm_source = run_dir / cm_relpath
+                cm_source = summary_root / cm_relpath
                 if cm_source.is_file():
                     bundle_relpath = copy_artifact(
                         cm_source,
@@ -492,6 +560,8 @@ def build_export(args: argparse.Namespace) -> Path:
         "feature_type": args.feature_type,
         "candidate_count": len(candidate_rows),
         "passing_count": len(candidate_rows),
+        "locus_count": annotations.locus_count,
+        "representative_count": annotations.representative_count,
         "description": args.description or f"RNAConSnake export for {feature_label}",
         "source_label": source_label,
         "coordinate_label": "",
@@ -514,8 +584,10 @@ def build_export(args: argparse.Namespace) -> Path:
             ("RNAConSnake.log", f"Summary log for len_{wlen}", "txt", 200),
             ("RNAConSnake.log.csv", f"Summary CSV for len_{wlen}", "csv", 201),
             ("RNAConSnake.md", f"Summary Markdown for len_{wlen}", "md", 202),
+            ("RNAConSnake.nr.csv", f"Non-redundant loci for len_{wlen}", "csv", 203),
+            ("RNAConSnake.nr.json", f"De-replication provenance for len_{wlen}", "json", 204),
         ]:
-            source = run_dir / "generated_files" / "summary" / f"len_{wlen}" / suffix
+            source = summary_root / "generated_files" / "summary" / f"len_{wlen}" / suffix
             if source.is_file():
                 bundle_relpath = copy_artifact(
                     source,
@@ -537,7 +609,7 @@ def build_export(args: argparse.Namespace) -> Path:
 
     manifest = {
         "project": "RNAConSnake",
-        "export_schema_version": "1.0.0",
+        "export_schema_version": "1.1.0",
         "pipeline_version": __version__,
         "dataset_id": dataset_id,
         "dataset_label": dataset_label,
@@ -559,10 +631,55 @@ def build_export(args: argparse.Namespace) -> Path:
             "preview_images": False,
             "rscape_outputs": any(row["rscape_available"] == "true" for row in candidate_rows),
             "covariance_model_outputs": any(row["cm_available"] == "true" for row in candidate_rows),
+            "dereplicated_loci": annotations.has_loci,
+            "calibrated_qvalues": annotations.has_calibration,
         },
+        **manifest_block(annotations),
     }
 
     write_json(output_dir / "manifest.json", manifest)
+    if annotations.calibration_dir is not None:
+        for index, name in enumerate(CALIBRATION_ARTIFACTS):
+            source = annotations.calibration_dir / name
+            if not source.is_file():
+                continue
+            bundle_relpath = copy_artifact(source, output_dir, f"files/dataset/calibration/{name}")
+            add_artifact(
+                artifacts,
+                artifact_scope="dataset",
+                artifact_owner_id=dataset_id,
+                artifact_type="calibration_table",
+                artifact_label=f"Null-model calibration: {name}",
+                file_format=name.rsplit(".", 1)[-1],
+                path=bundle_relpath,
+                is_optional=True,
+                group_name="calibration",
+                sort_order=300 + index,
+                description=(
+                    "Empirical FDR / q-values from the null-model arm. "
+                    "See the calibration block in manifest.json for whether the "
+                    "reported FDR is conditional on stage-one survival."
+                ),
+            )
+
+    if annotations.versions_file is not None:
+        bundle_relpath = copy_artifact(
+            annotations.versions_file, output_dir, "files/dataset/versions.yaml"
+        )
+        add_artifact(
+            artifacts,
+            artifact_scope="dataset",
+            artifact_owner_id=dataset_id,
+            artifact_type="provenance",
+            artifact_label="Toolchain versions",
+            file_format="yaml",
+            path=bundle_relpath,
+            is_optional=True,
+            group_name="provenance",
+            sort_order=400,
+            description="Exact external tool versions used for this run.",
+        )
+
     write_csv(output_dir / "features.csv", FEATURE_COLUMNS, [feature_row])
     write_csv(output_dir / "candidates.csv", CANDIDATE_COLUMNS, candidate_rows)
     write_csv(output_dir / "artifacts.csv", ARTIFACT_COLUMNS, artifacts)

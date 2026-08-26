@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import shlex
 import subprocess
@@ -62,58 +63,265 @@ class WorkflowSettings:
         return shlex.split(str(self.tools.get(name, default)))
 
 
+NULL_METHODS = ("sissiz", "rnazRandomizeAln", "none")
+
+REAL_ARM = "real"
+
+ARM_WILDCARD_PATTERN = r"real|null_\d{3}"
+
+
+@dataclass(frozen=True)
+class NullSettings:
+    """Configuration of the null-model calibration arm.
+
+    The null arm is *off* by default: ``method: none`` (or ``replicates: 0``)
+    reproduces the pre-calibration pipeline byte-for-byte, because the whole
+    ``arms/{arm}/`` path prefix collapses to the empty string.
+    """
+
+    method: str
+    replicates: int
+    seed: int
+    two_stage: bool
+    pool_file: str | None = None
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> "NullSettings":
+        # An unquoted ``null:`` key in YAML parses as the null scalar, so the
+        # section can arrive under ``None`` instead of ``"null"``. Accept both
+        # rather than silently ignoring a user's configuration.
+        section = config.get("null")
+        if section is None:
+            section = config.get(None)
+        raw = dict(section or {})
+        method = str(raw.get("method", "none"))
+        if method not in NULL_METHODS:
+            raise ValueError(
+                f"Unknown null.method {method!r}. Expected one of: " + ", ".join(NULL_METHODS)
+            )
+        return cls(
+            method=method,
+            replicates=int(raw.get("replicates", 10)),
+            seed=int(raw.get("seed", 20261101)),
+            two_stage=bool(raw.get("two_stage", True)),
+            pool_file=_optional_path(raw.get("pool_file")),
+        )
+
+    @property
+    def enabled(self) -> bool:
+        return self.method != "none" and self.replicates > 0
+
+    @property
+    def effective_replicates(self) -> int:
+        return self.replicates if self.enabled else 0
+
+    def null_arms(self) -> list[str]:
+        return [f"null_{index:03d}" for index in range(self.effective_replicates)]
+
+    def arms(self) -> list[str]:
+        if not self.enabled:
+            return []
+        return [REAL_ARM, *self.null_arms()]
+
+    def arm_seed(self, arm: str) -> int | None:
+        return arm_seed(arm, self.seed)
+
+
+@dataclass(frozen=True)
+class CalibrationSettings:
+    """Thresholds and tolerances used by the calibration aggregation step."""
+
+    rnaz_prob_threshold: float
+    alifoldz_threshold: float
+    rscape_min_pairs: int
+    stage1_rnaz_prob: float
+    locus_min_overlap: int
+    collapse_ratio_tolerance: float
+    dereplicate_method: str
+    pair_containment: float
+    max_container_width: int
+    container_min_coverage: float
+    representative_rule: str
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> "CalibrationSettings":
+        raw = dict(config.get("calibration", {}) or {})
+        dereplicate = dict(config.get("dereplicate", {}) or {})
+        return cls(
+            rnaz_prob_threshold=float(
+                raw.get("rnaz_prob_threshold", config.get("cm_rnaz_prob_threshold", 0.9))
+            ),
+            alifoldz_threshold=float(
+                raw.get("alifoldz_threshold", config.get("cm_alifoldz_threshold", -2.0))
+            ),
+            rscape_min_pairs=int(raw.get("rscape_min_pairs", 1)),
+            stage1_rnaz_prob=float(raw.get("stage1_rnaz_prob", 0.5)),
+            locus_min_overlap=int(raw.get("locus_min_overlap", 1)),
+            collapse_ratio_tolerance=float(raw.get("collapse_ratio_tolerance", 0.2)),
+            dereplicate_method=str(dereplicate.get("method", "containment")),
+            pair_containment=float(dereplicate.get("pair_containment", 0.9)),
+            max_container_width=int(dereplicate.get("max_container_width", 120)),
+            container_min_coverage=float(dereplicate.get("container_min_coverage", 0.8)),
+            representative_rule=str(dereplicate.get("representative", "widest")),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "rnaz_prob_threshold": self.rnaz_prob_threshold,
+            "alifoldz_threshold": self.alifoldz_threshold,
+            "rscape_min_pairs": self.rscape_min_pairs,
+            "stage1_rnaz_prob": self.stage1_rnaz_prob,
+            "locus_min_overlap": self.locus_min_overlap,
+            "collapse_ratio_tolerance": self.collapse_ratio_tolerance,
+            "dereplicate_method": self.dereplicate_method,
+            "pair_containment": self.pair_containment,
+            "max_container_width": self.max_container_width,
+            "container_min_coverage": self.container_min_coverage,
+            "representative_rule": self.representative_rule,
+        }
+
+
+def _optional_path(value: Any) -> str | None:
+    """Normalise an optional path from config.
+
+    Snakemake stringifies nested ``--config`` values, so a ``None`` arrives as
+    the literal string ``"None"``, which is truthy. Treat the stringified
+    empties as absent rather than as a filename.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    return None if text in {"", "None", "null", "~"} else text
+
+
+def arm_seed(arm: str, base_seed: int) -> int | None:
+    """Deterministic per-arm seed derived from the arm name and the base seed.
+
+    Returns ``None`` for the real arm, which is never simulated.
+    """
+    if arm == REAL_ARM:
+        return None
+    digest = hashlib.sha256(f"{int(base_seed)}:{arm}".encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+# Seeds Perl's RNG before handing control to a helper script, so that a rerun
+# reproduces the same shuffles. Used for alifoldz.pl and rnazRandomizeAln.pl,
+# neither of which exposes a seed option.
+PERL_SEED_BOOTSTRAP = "srand(shift); my $script = shift; do $script; die $@ if $@;"
+
+
+def perl_seed_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    """Environment that makes a seeded Perl run reproducible.
+
+    Perl randomises hash iteration order per process, so ``srand`` alone is not
+    enough to pin behaviour that walks a hash.
+    """
+    import os
+
+    resolved = dict(env if env is not None else os.environ)
+    resolved["PERL_HASH_SEED"] = "0"
+    resolved["PERL_PERTURB_KEYS"] = "0"
+    return resolved
+
+
+def perl_seeded_command(
+    tokens: list[str], seed: int, args: list[str] | None = None
+) -> tuple[list[str], bool]:
+    """Build a seeded invocation of a Perl helper script.
+
+    Returns ``(command, seeded)``. Falls back to the command unchanged, and
+    reports ``seeded=False``, when it is not a Perl script -- CI fakes and site
+    wrappers keep working, they just are not reproducible.
+    """
+    import shutil as _shutil
+
+    if not tokens:
+        raise ValueError("Empty command; cannot seed")
+    if Path(tokens[0]).name in {"perl", "perl5"} and len(tokens) > 1:
+        script, extra = tokens[1], tokens[2:]
+    else:
+        script = _shutil.which(tokens[0]) or tokens[0]
+        extra = tokens[1:]
+    if not script.endswith(".pl"):
+        return [*tokens, *(args or [])], False
+    return ["perl", "-e", PERL_SEED_BOOTSTRAP, str(seed), script, *extra, *(args or [])], True
+
+
+def derived_seed(base_seed: int, label: str) -> int:
+    """Deterministic per-item seed, so parallel jobs differ but reproduce."""
+    digest = hashlib.sha256(f"{int(base_seed)}:{label}".encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+def arm_prefix_for(arm: str | None) -> str:
+    """Path prefix for an arm; the empty string when the null arm is disabled."""
+    if not arm:
+        return ""
+    return f"arms/{arm}/"
+
+
+def arm_class(arm: str) -> str:
+    return REAL_ARM if arm == REAL_ARM else "null"
+
+
 @dataclass(frozen=True)
 class CandidatePaths:
     wlen: str | int
     file: str
+    arm_prefix: str = ""
 
     @property
     def len_dir(self) -> str:
         return f"len_{self.wlen}"
 
     @property
+    def arm_alignment(self) -> str:
+        return f"{self.arm_prefix}input_alignment.stk"
+
+    @property
     def split(self) -> str:
-        return f"Lalifold/{self.len_dir}/split/{self.file}.stk"
+        return f"{self.arm_prefix}Lalifold/{self.len_dir}/split/{self.file}.stk"
 
     @property
     def orig(self) -> str:
-        return f"generated_files/orig/{self.len_dir}/{self.file}.orig.stk"
+        return f"{self.arm_prefix}generated_files/orig/{self.len_dir}/{self.file}.orig.stk"
 
     @property
     def remgap(self) -> str:
-        return f"generated_files/remgap/{self.len_dir}/{self.file}_remgap.stk"
+        return f"{self.arm_prefix}generated_files/remgap/{self.len_dir}/{self.file}_remgap.stk"
 
     @property
     def strip(self) -> str:
-        return f"generated_files/strip/{self.len_dir}/{self.file}_stripped.stk"
+        return f"{self.arm_prefix}generated_files/strip/{self.len_dir}/{self.file}_stripped.stk"
 
     @property
     def stk(self) -> str:
-        return f"generated_files/stk/{self.len_dir}/{self.file}.stk"
+        return f"{self.arm_prefix}generated_files/stk/{self.len_dir}/{self.file}.stk"
 
     @property
     def aln(self) -> str:
-        return f"generated_files/aln/{self.len_dir}/{self.file}.aln"
+        return f"{self.arm_prefix}generated_files/aln/{self.len_dir}/{self.file}.aln"
 
     @property
     def rnaz_txt(self) -> str:
-        return f"generated_files/rnaz/{self.len_dir}/{self.file}.rnaz.txt"
+        return f"{self.arm_prefix}generated_files/rnaz/{self.len_dir}/{self.file}.rnaz.txt"
 
     @property
     def rnaz_json(self) -> str:
-        return f"generated_files/rnaz/{self.len_dir}/{self.file}.rnaz.json"
+        return f"{self.arm_prefix}generated_files/rnaz/{self.len_dir}/{self.file}.rnaz.json"
 
     @property
     def alifoldz_txt(self) -> str:
-        return f"generated_files/alifoldz/{self.len_dir}/{self.file}.alifoldz.txt"
+        return f"{self.arm_prefix}generated_files/alifoldz/{self.len_dir}/{self.file}.alifoldz.txt"
 
     @property
     def alifoldz_json(self) -> str:
-        return f"generated_files/alifoldz/{self.len_dir}/{self.file}.alifoldz.json"
+        return f"{self.arm_prefix}generated_files/alifoldz/{self.len_dir}/{self.file}.alifoldz.json"
 
     @property
     def rnaalifold_dir(self) -> str:
-        return f"generated_files/rnaalifold/{self.len_dir}/{self.file}"
+        return f"{self.arm_prefix}generated_files/rnaalifold/{self.len_dir}/{self.file}"
 
     @property
     def rnaalifold_stdout(self) -> str:
@@ -169,47 +377,47 @@ class CandidatePaths:
 
     @property
     def refold_out(self) -> str:
-        return f"generated_files/refold/{self.len_dir}/{self.file}_refold.out"
+        return f"{self.arm_prefix}generated_files/refold/{self.len_dir}/{self.file}_refold.out"
 
     @property
     def refold_json(self) -> str:
-        return f"generated_files/refold/{self.len_dir}/{self.file}.refold.json"
+        return f"{self.arm_prefix}generated_files/refold/{self.len_dir}/{self.file}.refold.json"
 
     @property
     def maxcovar_log(self) -> str:
-        return f"generated_files/maxcovar/{self.len_dir}/{self.file}_alifoldmaxcovar.log"
+        return f"{self.arm_prefix}generated_files/maxcovar/{self.len_dir}/{self.file}_alifoldmaxcovar.log"
 
     @property
     def maxcovar_json(self) -> str:
-        return f"generated_files/maxcovar/{self.len_dir}/{self.file}.maxcovar.json"
+        return f"{self.arm_prefix}generated_files/maxcovar/{self.len_dir}/{self.file}.maxcovar.json"
 
     @property
     def rscape_power(self) -> str:
-        return f"generated_files/rscape/{self.len_dir}/{self.file}.power"
+        return f"{self.arm_prefix}generated_files/rscape/{self.len_dir}/{self.file}.power"
 
     @property
     def rscape_json(self) -> str:
-        return f"generated_files/rscape/{self.len_dir}/{self.file}.rscape.json"
+        return f"{self.arm_prefix}generated_files/rscape/{self.len_dir}/{self.file}.rscape.json"
 
     @property
     def rscape_sto_pdf(self) -> str:
-        return f"generated_files/rscape/{self.len_dir}/{self.file}.sto.pdf"
+        return f"{self.arm_prefix}generated_files/rscape/{self.len_dir}/{self.file}.sto.pdf"
 
     @property
     def summary_json(self) -> str:
-        return f"generated_files/summary/{self.len_dir}/{self.file}.summary.json"
+        return f"{self.arm_prefix}generated_files/summary/{self.len_dir}/{self.file}.summary.json"
 
     @property
     def png_aln(self) -> str:
-        return f"generated_files/png/{self.len_dir}/{self.file}_aln.png"
+        return f"{self.arm_prefix}generated_files/png/{self.len_dir}/{self.file}_aln.png"
 
     @property
     def png_ss(self) -> str:
-        return f"generated_files/png/{self.len_dir}/{self.file}_ss.png"
+        return f"{self.arm_prefix}generated_files/png/{self.len_dir}/{self.file}_ss.png"
 
     @property
     def cm_status_json(self) -> str:
-        return f"generated_files/cm/{self.len_dir}/{self.file}.cm.status.json"
+        return f"{self.arm_prefix}generated_files/cm/{self.len_dir}/{self.file}.cm.status.json"
 
 
 def read_manifest(path: str | Path) -> list[str]:
@@ -242,7 +450,15 @@ def run_checked(
     cwd: str | Path | None = None,
 ) -> None:
     with contextlib.ExitStack() as stack:
-        stdin_handle = stack.enter_context(open(stdin_path, encoding="utf-8")) if stdin_path else None
+        # Never inherit the caller's stdin. Some external tools (notably
+        # refold.pl, whose <> falls back to STDIN once @ARGV is exhausted) will
+        # otherwise block forever reading the user's terminal, stalling every
+        # scheduler slot instead of failing.
+        stdin_handle = (
+            stack.enter_context(open(stdin_path, encoding="utf-8"))
+            if stdin_path
+            else subprocess.DEVNULL
+        )
         stdout_handle = stack.enter_context(open(stdout_path, "w", encoding="utf-8")) if stdout_path else None
         stderr_handle = stack.enter_context(open(stderr_path, "w", encoding="utf-8")) if stderr_path else None
         subprocess.run(
@@ -305,10 +521,11 @@ def candidate_outputs_for_manifest(
     manifest_path: str | Path,
     wlen: str | int,
     path_getter: Callable[[CandidatePaths], str | list[str]],
+    arm_prefix: str = "",
 ) -> list[str]:
     outputs: list[str] = []
     for file in split_file_basenames_from_manifest(manifest_path):
-        value = path_getter(CandidatePaths(wlen=wlen, file=file))
+        value = path_getter(CandidatePaths(wlen=wlen, file=file, arm_prefix=arm_prefix))
         if isinstance(value, list):
             outputs.extend(value)
         else:

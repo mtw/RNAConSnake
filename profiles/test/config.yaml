@@ -1,0 +1,16 @@
+# Snakemake profile for the CI / toy-set run.
+#
+#   snakemake --profile profiles/test --config input_alignment=<toy.stk>
+#
+# Intended to complete the whole DAG, including two null replicates, in a few
+# minutes on a laptop.
+cores: 4
+latency-wait: 20
+rerun-incomplete: true
+printshellcmds: true
+config:
+  - maxbpspan=[100]
+  - do_png=False
+  - do_rscape=False
+  - "null={'method': 'rnazRandomizeAln', 'replicates': 2, 'seed': 20261101, 'two_stage': True}"
+  - benchmark_allow_uncurated=True

@@ -1,0 +1,13 @@
+# Known flavivirus 3'UTR elements for the RNAcs positive control.
+# Source: Ochsenreiter, Hofacker & Wolfinger, Viruses 2019, 11(3):298.
+#
+# start/end are 1-based ALIGNMENT COLUMN coordinates and are alignment
+# specific. They are intentionally left as TBD: see README.md for how to
+# curate them against the benchmark alignment actually used.
+element_id	element_class	alignment	start	end	notes
+MBFV_xrRNA1	xrRNA	flavivirus_3utr	TBD	TBD	Mosquito-borne flavivirus xrRNA1, three-way junction with pseudoknot; the primary recovery target
+MBFV_xrRNA2	xrRNA	flavivirus_3utr	TBD	TBD	Mosquito-borne flavivirus xrRNA2, duplicated xrRNA fold
+MBFV_DB1	DB	flavivirus_3utr	TBD	TBD	Dumbbell element 1
+MBFV_DB2	DB	flavivirus_3utr	TBD	TBD	Dumbbell element 2
+MBFV_sHP	sHP	flavivirus_3utr	TBD	TBD	Small hairpin immediately 5' of the terminal 3'SL
+MBFV_3SL	3SL	flavivirus_3utr	TBD	TBD	Terminal 3' stem-loop, essential for replication

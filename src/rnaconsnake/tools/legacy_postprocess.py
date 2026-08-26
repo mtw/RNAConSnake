@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from rnaconsnake.tools.alifold_maxcovar import compute as compute_maxcovar
+from rnaconsnake.tools.dereplicate import NR_COLUMNS
 from rnaconsnake.workflow_helpers import SUMMARY_FIELDS
 
 
@@ -41,9 +42,32 @@ def cmd_extract_rnaz(args: argparse.Namespace) -> int:
     return 0
 
 
+# alifoldz.pl initialises its running minimum to 9999 and prints it unchanged
+# when no window was ever scored. It is a sentinel, never a real z-score.
+ALIFOLDZ_NO_RESULT = "9999"
+ALIFOLDZ_INPUT_LINE = re.compile(r"Input:\s+(\d+)\s+sequences of\s+(\d+)\s+columns")
+
+
 def cmd_extract_alifoldz(args: argparse.Namespace) -> int:
-    lines = [line.strip() for line in Path(args.input).read_text(encoding="utf-8").splitlines() if line.strip()]
+    text = Path(args.input).read_text(encoding="utf-8")
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     score = lines[-1] if lines else ""
+
+    # alifoldz.pl exits 0 even when it parsed nothing at all, so its own report
+    # of what it read is the only way to tell a score from a non-result.
+    match = ALIFOLDZ_INPUT_LINE.search(text)
+    if match and (match.group(1) == "0" or match.group(2) == "0"):
+        raise SystemExit(
+            f"alifoldz read {match.group(1)} sequences of {match.group(2)} columns from "
+            f"{args.input}: it parsed no alignment. alifoldz.pl matches Clustal rows with "
+            "[A-Z\\-.]+ and has no /i flag, so a lower-case alignment yields zero sequences."
+        )
+    if score == ALIFOLDZ_NO_RESULT:
+        raise SystemExit(
+            f"alifoldz scored no window for {args.input} and emitted its {ALIFOLDZ_NO_RESULT} "
+            "sentinel; refusing to record it as a z-score."
+        )
+
     write_json(args.output, {"alifoldzscore": score})
     return 0
 
@@ -56,11 +80,36 @@ def cmd_extract_rscape(args: argparse.Namespace) -> int:
     return 0
 
 
+# A Clustal sequence line: name, whitespace, then residues/gaps only.
+CLUSTAL_SEQUENCE_LINE = re.compile(r"^(\S+)(\s+)([A-Za-z._~-]+)\s*$")
+
+
+def _uppercase_clustal_sequences(line: str) -> str:
+    r"""Upper-case the residues of a Clustal sequence line, leaving the name alone.
+
+    ``refold.pl`` parses alignment rows with ``/^(\S+)\s+([A-Z\-]+)\s*$/`` -- it
+    accepts upper case only, as its own "Fixme" admits. Given a lower-case
+    alignment (MAFFT output, for instance) it matches nothing, reads zero
+    sequences, and then its ``<>`` falls through to STDIN and blocks forever.
+    Preparing the alignment for ``refold.pl`` is exactly this step's job, so
+    normalise the case here.
+    """
+    match = CLUSTAL_SEQUENCE_LINE.match(line)
+    if not match:
+        return line
+    name, gap, residues = match.groups()
+    return f"{name}{gap}{residues.upper()}"
+
+
 def cmd_clean_clustal(args: argparse.Namespace) -> int:
     source = Path(args.input).read_text(encoding="utf-8")
     Path(args.backup).write_text(source, encoding="utf-8")
 
-    cleaned_lines = [line for line in source.splitlines() if "*" not in line]
+    cleaned_lines = [
+        _uppercase_clustal_sequences(line)
+        for line in source.splitlines()
+        if "*" not in line
+    ]
     cleaned = "\n".join(cleaned_lines).rstrip() + "\n"
     Path(args.output).write_text(cleaned, encoding="utf-8")
     return 0
@@ -139,7 +188,8 @@ def cmd_render_reports(args: argparse.Namespace) -> int:
         reverse=True,
     )
     for path in [args.log, args.csv, args.markdown]:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        if path:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(args.log, "w", encoding="utf-8") as log_handle:
         for record in records:
@@ -155,14 +205,87 @@ def cmd_render_reports(args: argparse.Namespace) -> int:
         for record in records:
             writer.writerow({field: record.get(field, "") for field in SUMMARY_FIELDS})
 
-    with open(args.markdown, "w", encoding="utf-8") as md_handle:
-        md_handle.write(f"# RNAConSnake Summary: {args.label}\n\n")
-        md_handle.write(f"- Records: {len(records)}\n\n")
-        md_handle.write("| " + " | ".join(SUMMARY_FIELDS) + " |\n")
-        md_handle.write("| " + " | ".join(["---"] * len(SUMMARY_FIELDS)) + " |\n")
-        for record in records:
-            row = [str(record.get(field, "")).replace("\n", " ") for field in SUMMARY_FIELDS]
-            md_handle.write("| " + " | ".join(row) + " |\n")
+    if args.markdown:
+        _write_markdown_table(
+            args.markdown,
+            heading=f"# RNAConSnake Summary: {args.label}",
+            preamble=[f"- Records: {len(records)}"],
+            columns=SUMMARY_FIELDS,
+            rows=records,
+        )
+    return 0
+
+
+def _markdown_cell(value: object) -> str:
+    return str(value if value is not None else "").replace("\n", " ").replace("|", "\\|")
+
+
+def _markdown_table(columns: list[str], rows: list[dict[str, str]]) -> list[str]:
+    lines = [
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join(["---"] * len(columns)) + " |",
+    ]
+    for row in rows:
+        lines.append("| " + " | ".join(_markdown_cell(row.get(c, "")) for c in columns) + " |")
+    return lines
+
+
+def _write_markdown_table(path, heading, preamble, columns, rows) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(heading + "\n\n")
+        for line in preamble:
+            handle.write(line + "\n")
+        handle.write("\n")
+        for line in _markdown_table(columns, rows):
+            handle.write(line + "\n")
+
+
+def _read_csv_rows(path: str | Path) -> list[dict[str, str]]:
+    with open(path, encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def cmd_render_markdown(args: argparse.Namespace) -> int:
+    """Render the human-readable summary: non-redundant loci first, then every window.
+
+    The de-replicated block comes first because that is the list to read: one
+    row per locus rather than one per RNALalifold window, which reports a single
+    element repeatedly (see docs/dereplication.md). The full per-window table
+    follows unchanged, so nothing is hidden.
+    """
+    nr_rows = _read_csv_rows(args.nr)
+    full_rows = _read_csv_rows(args.full)
+
+    # Members last: it is the widest column and the least often read.
+    nr_columns = [c for c in NR_COLUMNS if c != "members"] + ["members"]
+
+    lines: list[str] = [f"# RNAConSnake Summary: {args.label}", ""]
+    lines.append(f"- Loci (non-redundant): {len(nr_rows)}")
+    lines.append(f"- Windows (all): {len(full_rows)}")
+    if args.method:
+        lines.append(f"- De-replication method: `{args.method}`")
+    lines += [
+        "",
+        "## Non-redundant candidates",
+        "",
+        "One row per locus: the best-scoring window, and the windows collapsed "
+        "into it. `locus_start`/`locus_end` is the union of the members, not the "
+        "extent of the reported element. See `docs/dereplication.md`.",
+        "",
+    ]
+    lines += _markdown_table(nr_columns, nr_rows)
+    lines += [
+        "",
+        "## All windows",
+        "",
+        f"Every RNALalifold window, including the {max(len(full_rows) - len(nr_rows), 0)} "
+        "collapsed above.",
+        "",
+    ]
+    lines += _markdown_table(SUMMARY_FIELDS, full_rows)
+
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.output).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return 0
 
 
@@ -218,9 +341,17 @@ def build_parser() -> argparse.ArgumentParser:
     reports.add_argument("--label", required=True)
     reports.add_argument("--log", required=True)
     reports.add_argument("--csv", required=True)
-    reports.add_argument("--markdown", required=True)
+    reports.add_argument("--markdown")
     reports.add_argument("inputs", nargs="+")
     reports.set_defaults(func=cmd_render_reports)
+
+    markdown = sub.add_parser("render-markdown")
+    markdown.add_argument("--label", required=True)
+    markdown.add_argument("--nr", required=True, help="Non-redundant locus CSV.")
+    markdown.add_argument("--full", required=True, help="Per-window summary CSV.")
+    markdown.add_argument("--output", required=True)
+    markdown.add_argument("--method", help="De-replication method, for the header.")
+    markdown.set_defaults(func=cmd_render_markdown)
 
     return parser
 
