@@ -1216,7 +1216,10 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
             lalifold_threads: 1
             do_cm: false
             do_locarnate: false
-            do_png: false
+            # do_png is on here -- and only here -- because true is the shipped
+            # default, so the ps2eps -> epstopdf -> magick chain is what a
+            # default run actually executes.
+            do_png: true
             """
         ),
         encoding="utf-8",
@@ -1268,6 +1271,10 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.md").is_file()
     assert (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.nr.csv").is_file()
     assert not (tmp_path / "generated_files" / "summary" / "len_150" / "RNAConSnake.html").exists()
+    png_dir = tmp_path / "generated_files" / "png" / "len_150"
+    assert (png_dir / "manifest.txt").is_file()
+    assert (png_dir / "RC_150_0001_aln_1_12_aln.png").is_file()
+    assert (png_dir / "RC_150_0001_aln_1_12_ss.png").is_file()
     assert "fake RNALalifold completed for window 150 format S" in read_text(
         tmp_path / "Lalifold" / "len_150" / "RNALalifold.out"
     )
@@ -2202,6 +2209,16 @@ def test_cli_workflow_null_arm_smoke_test(tmp_path: Path) -> None:
     write_fake_postprocess_tools(bin_dir)
     randomize = write_fake_randomize_aln(bin_dir)
 
+    # The fake RNALalifold reports one window over columns 1-12 in every arm,
+    # so a truth element there is recovered by the real arm -- and by the null
+    # arms too, which is exactly what the baseline exists to expose.
+    truth = tmp_path / "truth.tsv"
+    truth.write_text(
+        "element_id\telement_class\talignment\tstart\tend\tnotes\n"
+        "toy_element\txrRNA\ttoy\t1\t12\tsynthetic\n",
+        encoding="utf-8",
+    )
+
     (tmp_path / "config.yaml").write_text(
         textwrap.dedent(
             f"""\
@@ -2222,6 +2239,7 @@ def test_cli_workflow_null_arm_smoke_test(tmp_path: Path) -> None:
               alifoldz_threshold: -2.0
               rscape_min_pairs: 1
               stage1_rnaz_prob: 0.5
+            benchmark_truth: {truth}
             tools:
               rnaz_randomize_aln: {randomize}
             """
@@ -2248,6 +2266,7 @@ def test_cli_workflow_null_arm_smoke_test(tmp_path: Path) -> None:
             str(tmp_path),
             "--maxbpspan",
             "150",
+            "--benchmark",
             "--cores",
             "1",
             "--",
@@ -2292,9 +2311,55 @@ def test_cli_workflow_null_arm_smoke_test(tmp_path: Path) -> None:
     assert summary["fdr_conditional_on_stage_one"] is True
     assert summary["counting_unit"] == "merged_loci"
 
-    # Reproducibility bookkeeping travels with the calibrated run.
+    # Reproducibility bookkeeping travels with the calibrated run. This also
+    # guards --benchmark being *additive*: naming a target replaces the default
+    # one, so asking for the recovery table must not drop the run's outputs.
     assert (tmp_path / "results" / "versions.yaml").is_file()
     assert (tmp_path / "null_pool" / "pool.json").is_file()
+
+    # The positive control ran, and it carries its null baseline: a recovery
+    # count without one says nothing about whether the screen found structure.
+    recovery = read_text(tmp_path / "results" / "benchmark" / "flavivirus_recovery.tsv")
+    assert "# recovered\t1" in recovery
+    assert "over 2 null arms" in recovery
+    assert "not evidence of detection" in recovery  # both arms recover it here
+    assert "toy_element" in recovery
+
+
+def test_ci_test_profile_builds_the_calibrated_dag(tmp_path: Path) -> None:
+    """profiles/test documents itself as the CI / toy run, so it has to keep
+    producing the DAG it claims: both arms plus calibration, PNGs off. A dry
+    run needs no external tools, so this holds wherever the suite runs."""
+    import re as _re
+
+    alignment = tmp_path / "toy.stk"
+    alignment.write_text(TOY_ALIGNMENT, encoding="utf-8")
+    # input_alignment travels in a configfile: a command-line --config would
+    # replace the profile's own config entries wholesale.
+    configfile = tmp_path / "config.yaml"
+    configfile.write_text(f"input_alignment: {alignment}\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            PYTHON, "-m", "snakemake", "-n",
+            "--snakefile", str(ROOT / "snakefile"),
+            "--profile", str(ROOT / "profiles" / "test"),
+            "--directory", str(tmp_path),
+            "--configfile", str(configfile),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    output = result.stdout + result.stderr
+    # The real arm and both null replicates, and the step that needs them.
+    assert _re.search(r"^make_arm_alignment\s+3$", output, _re.M), output
+    assert _re.search(r"^calibrate\s+1$", output, _re.M), output
+    # do_png=False in the profile, so the image branch stays out of the DAG.
+    assert "render_pngs_file" not in output
 
 
 def test_cli_workflow_none_method_keeps_legacy_layout(tmp_path: Path) -> None:

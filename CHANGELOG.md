@@ -81,6 +81,10 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - **Only the default curated truth file was packaged.** `benchmark_truth` can
   name any file in `resources/benchmark/`, but the build hook copied one of
   them, so an installed run could not resolve the others.
+- **`--benchmark` replaced the default targets instead of adding to them.**
+  Naming a target makes Snakemake ignore `rule all`, so `RNAcs --benchmark`
+  built the recovery table and whatever it depended on, silently skipping the
+  rest of the run -- `results/versions.yaml` among it.
 
 ### Changed
 - **The command-line tool is now `RNAcs`.** `rnaconsnake-run` remains a

@@ -641,7 +641,10 @@ def main() -> int:
     if args.benchmark:
         # Positional targets have to come before any nargs="+" option, ours or
         # the user's, or argparse swallows them as malformed --config entries.
-        cmd.append("results/benchmark/flavivirus_recovery.tsv")
+        # "all" is named explicitly: naming any target at all replaces the
+        # default one, and --benchmark builds the recovery table *in addition
+        # to* the run, not instead of it.
+        cmd += ["all", "results/benchmark/flavivirus_recovery.tsv"]
     if args.output_dir:
         cmd.extend(["--directory", str(Path(args.output_dir).resolve())])
     if args.conservative:

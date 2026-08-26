@@ -9,7 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        # The floor declared in pyproject, the versions in between, and the one
+        # development happens on. A floor nothing builds against is a guess.
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -100,3 +102,28 @@ jobs:
             echo "Expected missing RNALalifold in CI"
             exit 1
           fi
+
+      # A file present in the repository but missing from the built
+      # distribution is invisible to every other check here.
+      - name: Check the installed package carries the workflow and its resources
+        run: |
+          . .venv/bin/activate
+          python - <<'EOF'
+          import sys
+          from importlib.resources import files
+          from pathlib import Path
+
+          root = files("rnaconsnake")
+          missing = [
+              name
+              for name in ("workflow/snakefile", "workflow/config.yaml")
+              if not root.joinpath(name).is_file()
+          ]
+          packaged = {p.name for p in Path(str(root.joinpath("resources/benchmark"))).glob("*")}
+          for truth in Path("resources/benchmark").glob("*.tsv"):
+              if truth.name not in packaged:
+                  missing.append(f"resources/benchmark/{truth.name}")
+          if missing:
+              sys.exit("missing from the installed package: " + ", ".join(missing))
+          print("installed package carries:", sorted(packaged))
+          EOF
