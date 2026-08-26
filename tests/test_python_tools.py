@@ -4301,3 +4301,198 @@ def test_no_text_file_discloses_a_non_public_downstream_project() -> None:
             line = text[: match.start()].count("\n") + 1
             offenders.append(f"{path}:{line}: {match.group(0)!r}")
     assert not offenders, "public files disclose a non-public downstream project:\n" + "\n".join(offenders)
+
+
+# --- refold ------------------------------------------------------------------
+#
+# A Python reimplementation of ViennaRNA's refold.pl. The constraint logic is
+# pure text processing and is tested without the bindings; the folding tests
+# skip where the bindings are absent.
+
+
+def _refold_alignment(rows: dict[str, str]):
+    from rnaconsnake.tools.alignment_io import Alignment
+
+    return Alignment(order=list(rows), seqs=dict(rows))
+
+
+def test_refold_pair_table_indexes_partners_and_rejects_unbalanced() -> None:
+    from rnaconsnake.tools.refold import RefoldError, pair_table
+
+    assert pair_table("((..))") == [5, 4, -1, -1, 1, 0]
+    with pytest.raises(RefoldError):
+        pair_table("((.)")
+    with pytest.raises(RefoldError):
+        pair_table(".)")
+
+
+def test_refold_opens_pairs_to_a_gap_and_drops_the_column() -> None:
+    """A pair whose partner is a gap in this sequence cannot form, and the gap
+    column itself leaves the sequence, so both have to go."""
+    from rnaconsnake.tools.refold import constrain
+
+    sequence, constraint = constrain("GGC-AGCC", "(((())))", turn=0)
+    assert sequence == "GGCAGCC"
+    assert constraint == "(((.)))"
+
+
+def test_refold_opens_pairs_the_sequence_cannot_form() -> None:
+    from rnaconsnake.tools.refold import constrain
+
+    # Columns 1 and 6 hold A and A, which is not a base pair, so that pair
+    # opens while the enclosing G-C survives.
+    sequence, constraint = constrain("GAGAAAAC", "((....))", turn=0)
+    assert sequence == "GAGAAAAC"
+    assert constraint == "(......)"
+
+    # G-A on the outer pair too: nothing is left to constrain.
+    _, constraint = constrain("GAGAAAAA", "((....))", turn=0)
+    assert constraint == "........"
+
+
+def test_refold_opens_pairs_closing_a_loop_shorter_than_turn() -> None:
+    from rnaconsnake.tools.refold import constrain
+
+    # The inner pair encloses two positions; the default turn of 3 opens it.
+    _, tight = constrain("GGCCAAGGCC", "((((..))))", turn=3)
+    assert tight == "(((....)))"
+    _, loose = constrain("GGCCAAGGCC", "((((..))))", turn=2)
+    assert loose == "((((..))))"
+
+
+def test_refold_reads_the_consensus_from_a_dot_plot_above_the_threshold() -> None:
+    from rnaconsnake.tools.refold import consensus_from_dotplot
+
+    # The coloured layout RNAalifold -p writes, and the plain one.
+    text = "\n".join(
+        [
+            "%!PS-Adobe-3.0 EPSF-3.0",
+            "0.00 1.00 hsb 1 10 0.99 lbox",
+            "0.00 1.00 hsb 2 9 0.50 lbox",
+            "3 8 0.95 lbox",
+            "1 10 0.99 ubox",
+        ]
+    )
+    assert consensus_from_dotplot(text, 10, threshold=0.9) == "(.(....).)"
+    assert consensus_from_dotplot(text, 10, threshold=0.4) == "(((....)))"
+
+
+def test_refold_reads_the_consensus_from_the_rnaalifold_output() -> None:
+    from rnaconsnake.tools.refold import RefoldError, consensus_from_alifold
+
+    text = "\n".join(
+        [
+            ">cand_0001",
+            "GGGCUAGCCC",
+            "(((....))) (-5.20 = -4.10 + -1.10)",
+            "(((....))) [-5.30]",
+        ]
+    )
+    assert consensus_from_alifold(text) == "(((....)))"
+    with pytest.raises(RefoldError):
+        consensus_from_alifold("no structure here\n")
+
+
+def test_refold_constraint_stream_matches_the_refold_pl_format() -> None:
+    from rnaconsnake.tools.refold import format_constraints, refold_alignment
+
+    alignment = _refold_alignment({"a": "GGCAAGCC", "b": "GGC-AGCC"})
+    records = refold_alignment(alignment, "(((())))", turn=0)
+    # a: the innermost A-A pair opens. b: the gap column goes and its partner
+    # opens with it.
+    assert format_constraints(records) == "> a\nGGCAAGCC\n(((..)))\n> b\nGGCAGCC\n(((.)))\n"
+
+
+def test_refold_opens_a_pair_whose_partner_sits_in_column_zero() -> None:
+    """refold.pl guards this branch with `$pt[$p] > 0`, leaves the `(` in
+    column 0 unmatched, and then dies in its own pair-table check. Opening it
+    is the only sensible reading, and it cannot change any output refold.pl
+    produced successfully."""
+    from rnaconsnake.tools.refold import constrain
+
+    sequence, constraint = constrain("GAAA-", "(...)", turn=0)
+    assert sequence == "GAAA"
+    assert constraint == "...."
+
+
+def test_refold_rejects_a_consensus_of_the_wrong_length() -> None:
+    from rnaconsnake.tools.refold import RefoldError, constrain
+
+    with pytest.raises(RefoldError):
+        constrain("GGCC", "((((((", turn=0)
+
+
+def test_refold_folds_under_the_constraint_and_formats_like_rnafold() -> None:
+    """The folded output has to be what `refold.pl | RNAfold --noPS -C` writes,
+    because that is the file the workflow records."""
+    import re as _re
+
+    pytest.importorskip("RNA")
+    from rnaconsnake.tools.refold import fold_constrained, format_folded, refold_alignment
+
+    alignment = _refold_alignment({"seq": "GGGGAAAACCCC"})
+    records = refold_alignment(alignment, "((((....))))", turn=3)
+    structure, energy = fold_constrained(records[0].sequence, records[0].constraint)
+    assert structure == "((((....))))"
+    assert energy < 0
+
+    text = format_folded(records)
+    lines = text.splitlines()
+    assert lines[0] == "> seq"
+    assert lines[1] == "GGGGAAAACCCC"
+    # `structure ( -1.20)`: six columns of energy, as RNAfold prints it.
+    assert _re.fullmatch(r"[().]{12} \( *-?\d+\.\d\d\)", lines[2]), lines[2]
+
+
+def test_refold_matches_refold_pl_where_it_is_installed(tmp_path: Path) -> None:
+    """Equivalence against the Perl original, when it is available to compare."""
+    if shutil.which("refold.pl") is None or shutil.which("RNAfold") is None:
+        pytest.skip("refold.pl and RNAfold are needed to compare against the original")
+    pytest.importorskip("RNA")
+
+    aln = tmp_path / "cand.aln"
+    aln.write_text(
+        "CLUSTAL 2.1 multiple sequence alignment\n\n"
+        "seqA GGGCUAGCUAGGCAUCGAUCGGCUAGCUAGCCGAUCGAUGCCUAGCUAGCCC\n"
+        "seqB GGGCUAGCUAGGCAUCGAUC-GCUAGCUAGCCGAUCGAUGCCUAGCUAGCCC\n"
+        "seqC GGGCUAGCAAGGCAUCGAUCGGCUAGCUAGCCGAUCGAUGCCUAGCUUGCCC\n",
+        encoding="utf-8",
+    )
+    consensus = tmp_path / "cand.alifold"
+    consensus.write_text(
+        ">cand\n"
+        "GGGCUAGCUAGGCAUCGAUCGGCUAGCUAGCCGAUCGAUGCCUAGCUAGCCC\n"
+        "((((((((((((((((((((((((....)))))))))))))))))))))))) (-58.97 = -49.63 + -9.35)\n",
+        encoding="utf-8",
+    )
+
+    perl = subprocess.run(
+        ["refold.pl", str(aln), str(consensus)],
+        check=True,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
+    folded = subprocess.run(
+        ["RNAfold", "--noPS", "-C"],
+        input=perl.stdout,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    mine = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.refold",
+            "--alignment",
+            str(aln),
+            "--consensus",
+            str(consensus),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    assert mine.stdout == folded.stdout

@@ -59,3 +59,9 @@ ebov_5prime/
 
 # kept locally, not part of the public release
 ARCHITECTURE.md
+
+# Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml

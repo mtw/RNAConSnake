@@ -32,6 +32,11 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - **Analysis aids**, outside the DAG: `fold_region` (fold and plot an arbitrary
   span), `threshold_sweep` (thresholds vs FDR), `sensitivity_envelope`
   (alignment subsets for measuring the detection floor).
+- **`tools/refold`**, a reimplementation of ViennaRNA's `refold.pl` that needs
+  only the ViennaRNA Python bindings: no Perl, and no `RNAfold` subprocess,
+  since the constrained fold runs in-process. Verified byte-identical to
+  `refold.pl | RNAfold --noPS -C` over 38 windows from two flavivirus
+  alignments, in both constraint modes. Not wired into the workflow yet.
 - **Reproducibility artefacts:** `results/versions.yaml`, `CITATION.cff`,
   `environment.yaml`, a `profiles/test/` CI profile, and a
   [container](container/README.md) pinning the whole toolchain — including

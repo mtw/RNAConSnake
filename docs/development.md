@@ -144,6 +144,7 @@ runnable as `python -m rnaconsnake.tools.<name>`.
 | `benchmark` | recovery scoring against a curated truth file, with null baseline |
 | `benchmark_scaffold` | drafts a truth file from an `#=GC SS_cons` reference |
 | `fold_region` | folds and plots an arbitrary alignment span |
+| `refold` | `refold.pl` in Python: per-sequence constraints from the consensus, folded in-process |
 | `alignment_report` | per-window screenability: where the screen is blind |
 | `threshold_sweep` | cascade thresholds vs FDR, reusing a calibrated run |
 | `sensitivity_envelope` | alignment subsets for measuring the detection floor |
@@ -153,6 +154,30 @@ runnable as `python -m rnaconsnake.tools.<name>`.
 Two are analysis aids rather than pipeline steps, and are not wired into the
 DAG: `fold_region` and `sensitivity_envelope`. `threshold_sweep` likewise runs
 against a finished calibration.
+
+### refold
+
+`refold` replaces ViennaRNA's `refold.pl` and the `RNAfold -C` it feeds:
+
+```bash
+python -m rnaconsnake.tools.refold \
+  --alignment run_dir/.../RNAalifold_results.cleaned.aln \
+  --consensus run_dir/.../<candidate>_dp.ps \
+  --output refold.out
+```
+
+`--consensus` takes either an `RNAalifold -p` dot plot (pairs above
+`--threshold`, default 0.9) or `RNAalifold`'s own output. `--constraints-only`
+writes the stream `refold.pl` produced, for piping into `RNAfold -C`; the
+default folds in-process through the ViennaRNA Python bindings and writes what
+`RNAfold --noPS -C` would have written.
+
+It is **not wired into the workflow**, which still runs `refold.pl | RNAfold`.
+Output was checked byte-for-byte against that pipe over 38 candidate windows
+from two flavivirus alignments, in both constraint modes. The module needs the
+`RNA` Python module only when it folds; the constraint logic imports nothing.
+Where the two differ, `refold.pl` fails rather than disagreeing — see the
+module docstring.
 
 ## Shipping Model
 
