@@ -111,10 +111,8 @@ def write_stockholm_alignment(
         handle.write("# STOCKHOLM 1.0\n")
         if identifier:
             handle.write(f"#=GF ID {identifier}\n")
-        for line in extra_gf or []:
-            handle.write(f"{line}\n")
-        for name in alignment.order:
-            handle.write(f"{name} {alignment.seqs[name]}\n")
+        handle.writelines(f"{line}\n" for line in extra_gf or [])
+        handle.writelines(f"{name} {alignment.seqs[name]}\n" for name in alignment.order)
         handle.write("//\n")
 
 

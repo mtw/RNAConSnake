@@ -251,8 +251,7 @@ def simulate_pool(
         for index, alignment in enumerate(normalized):
             handle.write("# STOCKHOLM 1.0\n")
             handle.write(f"#=GF ID null_{index:03d}\n")
-            for name in alignment.order:
-                handle.write(f"{name} {alignment.seqs[name]}\n")
+            handle.writelines(f"{name} {alignment.seqs[name]}\n" for name in alignment.order)
             handle.write("//\n")
 
     metadata = {
@@ -365,8 +364,7 @@ def make_arm_alignment(
     with open(output, "w", encoding="utf-8") as handle:
         handle.write("# STOCKHOLM 1.0\n")
         handle.write(f"#=GF ID {arm}\n")
-        for name in record.seq_order:
-            handle.write(f"{name} {record.seqs[name]}\n")
+        handle.writelines(f"{name} {record.seqs[name]}\n" for name in record.seq_order)
         handle.write("//\n")
 
 

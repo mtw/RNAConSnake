@@ -425,8 +425,7 @@ def read_manifest(path: str | Path) -> list[str]:
 
 def write_manifest(path: str | Path, entries: list[str]) -> None:
     with open(path, "w", encoding="utf-8") as handle:
-        for entry in entries:
-            handle.write(f"{entry}\n")
+        handle.writelines(f"{entry}\n" for entry in entries)
 
 
 def write_json(path: str | Path, payload: dict[str, Any]) -> None:

@@ -417,8 +417,7 @@ def calibrate(
         handle.write(f"# {conditional_note}\n")
         handle.write("# counts are on merged loci, not raw RNALalifold windows\n")
         handle.write(f"# rscape_in_cascade\t{str(include_rscape).lower()}\n")
-        for message in warnings:
-            handle.write(f"# WARNING\t{message}\n")
+        handle.writelines(f"# WARNING\t{message}\n" for message in warnings)
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(FUNNEL_COLUMNS)
         for arm in arms:

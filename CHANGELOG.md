@@ -66,6 +66,10 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   pinned pool are now byte-identical.
 - **A stray `alirna.ps` was written to the run root**, once per shuffle from
   every candidate in parallel. AlifoldZ now runs in a private scratch directory.
+- **`fold_region` dropped a stray `alirna.ps` into the caller's directory.** It
+  ran AlifoldZ with no working directory of its own; AlifoldZ shells out to
+  RNAalifold without `--noPS`. It now runs in the output directory, like the
+  workflow rule does.
 - `parse_stockholm_records` silently truncated interleaved Stockholm alignments
   to their last block.
 - The export bundle now resolves `arms/real/` when the null-model arm is enabled.
@@ -112,7 +116,11 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   defaults to 120; `strip_aln` upper-cases sequences. The cascade thresholds and
   representative rule are locked in `config.yaml`, and a test pins them.
 - **Ruff is now the linter and formatter**, enforced in CI (`ruff check`,
-  `ruff format --check`) and configured in `pyproject.toml` at 110 columns. The
+  `ruff format --check`) and configured in `pyproject.toml` at 110 columns,
+  with pycodestyle, pyflakes, import order, pyupgrade, bugbear,
+  comprehensions, simplifications, ruff's own checks, pytest style (tests
+  only), naming, performance, return shape, modern idioms, tidy imports and a
+  complexity ceiling set to today's worst function. The
   tree was formatted in one pass; the lint fixes it required were unused
   imports, import order, `zip(..., strict=)` on alignment rows, and a file
   handle left unclosed in the tests.

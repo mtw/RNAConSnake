@@ -94,8 +94,7 @@ def write_subset_alignment(alignment: Alignment, subset: Subset, path: Path, lab
     with open(path, "w", encoding="utf-8") as handle:
         handle.write("# STOCKHOLM 1.0\n")
         handle.write(f"#=GF ID {label}\n")
-        for name in subset.names:
-            handle.write(f"{name} {alignment.seqs[name]}\n")
+        handle.writelines(f"{name} {alignment.seqs[name]}\n" for name in subset.names)
         handle.write("//\n")
 
 
@@ -117,7 +116,7 @@ def plan(
                     "n_seq": n_seq,
                     "identity": subset.identity,
                     "names": ";".join(subset.names),
-                    "label": f"n{n_seq}_id{int(round(subset.identity * 100)):02d}",
+                    "label": f"n{n_seq}_id{round(subset.identity * 100):02d}",
                 }
             )
     return rows

@@ -24,7 +24,7 @@ def compute(lines: Iterable[str]) -> tuple[int, str]:
             continue
 
         last = data[-1]
-        if last.endswith("+") or last.endswith("-"):
+        if last.endswith(("+", "-")):
             continue
 
         has_gapali = last.startswith("--:") and last[3:].isdigit()

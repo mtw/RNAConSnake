@@ -82,8 +82,7 @@ def parse_stockholm_records(path: str | Path) -> list[StockholmRecord]:
 
 def write_stockholm_record(record: StockholmRecord, path: str | Path) -> None:
     with open(path, "w", encoding="utf-8") as handle:
-        for line in iter_stockholm_lines(record):
-            handle.write(f"{line}\n")
+        handle.writelines(f"{line}\n" for line in iter_stockholm_lines(record))
 
 
 def iter_stockholm_lines(record: StockholmRecord) -> Iterable[str]:

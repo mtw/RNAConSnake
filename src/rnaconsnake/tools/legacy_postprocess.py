@@ -194,12 +194,12 @@ def cmd_render_reports(args: argparse.Namespace) -> int:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(args.log, "w", encoding="utf-8") as log_handle:
-        for record in records:
-            log_handle.write(
-                "X {wbn} {nrseq} {alilen} maxcovar {maxcovarval} {maxcovarcount} rscape "
-                "{rscape_covary_count} {rnazprob} {sci} {consensus_mfe} {alifoldzscore} "
-                "{alifold_consstruc}\n".format(**record)
-            )
+        log_handle.writelines(
+            "X {wbn} {nrseq} {alilen} maxcovar {maxcovarval} {maxcovarcount} rscape "
+            "{rscape_covary_count} {rnazprob} {sci} {consensus_mfe} {alifoldzscore} "
+            "{alifold_consstruc}\n".format(**record)
+            for record in records
+        )
 
     with open(args.csv, "w", encoding="utf-8", newline="") as csv_handle:
         writer = csv.DictWriter(csv_handle, fieldnames=SUMMARY_FIELDS)
@@ -235,11 +235,9 @@ def _markdown_table(columns: list[str], rows: list[dict[str, str]]) -> list[str]
 def _write_markdown_table(path, heading, preamble, columns, rows) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(heading + "\n\n")
-        for line in preamble:
-            handle.write(line + "\n")
+        handle.writelines(line + "\n" for line in preamble)
         handle.write("\n")
-        for line in _markdown_table(columns, rows):
-            handle.write(line + "\n")
+        handle.writelines(line + "\n" for line in _markdown_table(columns, rows))
 
 
 def _read_csv_rows(path: str | Path) -> list[dict[str, str]]:

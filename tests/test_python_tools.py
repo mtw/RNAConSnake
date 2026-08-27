@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import re
@@ -400,7 +401,7 @@ def test_initial_alignment_format_code_handles_suffixless_input() -> None:
 
 
 def test_initial_alignment_format_code_missing_input() -> None:
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError, match=r"input_alignment") as exc:
         initial_alignment_format_code(None)
     assert "input_alignment.{stk,aln}" in str(exc.value)
 
@@ -1115,8 +1116,10 @@ def test_write_summary_outputs_preserves_rscape_zero_and_na(tmp_path: Path) -> N
     csv_text = read_text(tmp_path / "RNAConSnake.log.csv")
     md_text = read_text(tmp_path / "RNAConSnake.md")
 
-    assert "rec_zero" in log_text and "rscape 0" in log_text
-    assert "rec_na" in log_text and "rscape NA" in log_text
+    assert "rec_zero" in log_text
+    assert "rscape 0" in log_text
+    assert "rec_na" in log_text
+    assert "rscape NA" in log_text
     assert "rec_zero,2,12,1,1,0,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
     assert "rec_na,2,12,1,1,NA,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
     assert "| rec_zero | 2 | 12 | 1 | 1 | 0 | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
@@ -1220,7 +1223,7 @@ def test_verify_run_consistency_reports_changed_cleaned_alignment(tmp_path: Path
     assert "len_150: cleaned alignments: content differs" in result.stdout
 
 
-_REFOLD_RECORD = re.compile(r"^> \S+\n[ACGUN]+\n[().]+ \( *-?\d+\.\d\d\)$", re.M)
+_REFOLD_RECORD = re.compile(r"^> \S+\n[ACGUN]+\n[().]+ \( *-?\d+\.\d\d\)$", re.MULTILINE)
 
 
 def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
@@ -1501,7 +1504,7 @@ def test_null_settings_accepts_unquoted_yaml_null_key() -> None:
 def test_null_settings_rejects_unknown_method() -> None:
     from rnaconsnake.workflow_helpers import NullSettings
 
-    with pytest.raises(ValueError, match="Unknown null.method"):
+    with pytest.raises(ValueError, match=r"Unknown null\.method"):
         NullSettings.from_config({"null": {"method": "dinucleotide-magic"}})
 
 
@@ -2321,7 +2324,7 @@ def test_snakefile_defines_every_rule_exactly_once() -> None:
     import re as _re
 
     text = read_text(Path("snakefile"))
-    names = _re.findall(r"^\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", text, _re.M)
+    names = _re.findall(r"^\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", text, _re.MULTILINE)
     duplicates = sorted({name for name in names if names.count(name) > 1})
     assert not duplicates, f"duplicated rule definitions: {duplicates}"
 
@@ -2335,7 +2338,7 @@ def test_snakefile_has_no_duplicated_rule_bodies() -> None:
     import re as _re
 
     text = read_text(Path("snakefile"))
-    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.M)
+    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.MULTILINE)
     bodies: dict[str, str] = {}
     for block in blocks:
         match = _re.match(r"\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", block)
@@ -2463,7 +2466,9 @@ def test_cli_workflow_null_arm_smoke_test(tmp_path: Path) -> None:
     null_0 = read_text(tmp_path / "arms" / "null_000" / "input_alignment.stk")
     null_1 = read_text(tmp_path / "arms" / "null_001" / "input_alignment.stk")
     assert real_arm == TOY_ALIGNMENT
-    assert null_0 != real_arm and null_1 != real_arm and null_0 != null_1
+    assert null_0 != real_arm
+    assert null_1 != real_arm
+    assert null_0 != null_1
 
     calibration = tmp_path / "results" / "calibration"
     funnel = read_text(calibration / "funnel.tsv")
@@ -2532,8 +2537,8 @@ def test_ci_test_profile_builds_the_calibrated_dag(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     output = result.stdout + result.stderr
     # The real arm and both null replicates, and the step that needs them.
-    assert _re.search(r"^make_arm_alignment\s+3$", output, _re.M), output
-    assert _re.search(r"^calibrate\s+1$", output, _re.M), output
+    assert _re.search(r"^make_arm_alignment\s+3$", output, _re.MULTILINE), output
+    assert _re.search(r"^calibrate\s+1$", output, _re.MULTILINE), output
     # do_png=False in the profile, so the image branch stays out of the DAG.
     assert "render_pngs_file" not in output
 
@@ -2896,7 +2901,8 @@ def test_strip_aln_uppercases_sequences_for_the_perl_toolchain(tmp_path: Path) -
     assert "Seq_a TCAGACCACTTAG--TGCC" in result.stdout
     assert "Seq_b TCAGATCCGAAA---GGCC" in result.stdout
     # Names and annotation rows keep their original form.
-    assert "Seq_a" in result.stdout and "SEQ_A" not in result.stdout
+    assert "Seq_a" in result.stdout
+    assert "SEQ_A" not in result.stdout
     assert "#=GC SS_cons <<<<.......>>>>...." in result.stdout
 
 
@@ -3051,7 +3057,7 @@ def test_configurable_rules_declare_their_settings_as_params() -> None:
     import re as _re
 
     text = read_text(Path("snakefile"))
-    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.M)
+    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.MULTILINE)
     by_name = {}
     for block in blocks:
         match = _re.match(r"\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", block)
@@ -3060,7 +3066,7 @@ def test_configurable_rules_declare_their_settings_as_params() -> None:
 
     for rule in ["dereplicate_summary", "calibrate", "benchmark_recovery"]:
         assert rule in by_name, f"{rule} is missing from the snakefile"
-        assert _re.search(r"^\s+params:", by_name[rule], _re.M), (
+        assert _re.search(r"^\s+params:", by_name[rule], _re.MULTILINE), (
             f"rule {rule} reads configurable settings but declares no params:, "
             "so changing them will not trigger a re-run"
         )
@@ -3196,7 +3202,7 @@ def test_markdown_puts_the_non_redundant_block_before_the_full_table(tmp_path: P
     assert "including the 1 collapsed above" in text
 
     # members is pushed to the last column: widest and least often read.
-    header = [line for line in text.splitlines() if line.startswith("| locus_id")][0]
+    header = next(line for line in text.splitlines() if line.startswith("| locus_id"))
     assert header.rstrip().endswith("members |")
 
 
@@ -3215,7 +3221,7 @@ def test_summary_logs_no_longer_owns_the_markdown() -> None:
     import re as _re
 
     text = read_text(Path("snakefile"))
-    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.M)
+    blocks = _re.split(r"^(?=\s*(?:rule|checkpoint)\s+[A-Za-z_])", text, flags=_re.MULTILINE)
     by_name = {}
     for block in blocks:
         match = _re.match(r"\s*(?:rule|checkpoint)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", block)
@@ -3366,7 +3372,9 @@ def test_export_annotations_read_calibration_qvalues(tmp_path: Path) -> None:
     annotations = collect(tmp_path)
     assert annotations.has_calibration is True
     q = annotations.qvalues_for("RC_100_0001_aln_1_100")
-    assert q is not None and q.q_cascade == "0.1" and q.cascade_pass == "yes"
+    assert q is not None
+    assert q.q_cascade == "0.1"
+    assert q.cascade_pass == "yes"
 
     block = manifest_block(annotations)
     assert block["calibration"]["applied"] is True
@@ -3637,14 +3645,16 @@ def test_perl_seeded_command_wraps_scripts_and_falls_back(tmp_path: Path) -> Non
     script.write_text("print 1;\n", encoding="utf-8")
     command, seeded = perl_seeded_command([str(script)], 42, ["-f"])
     assert seeded is True
-    assert command[0] == "perl" and command[3] == "42" and command[-1] == "-f"
+    assert command[0] == "perl"
+    assert command[3] == "42"
+    assert command[-1] == "-f"
 
     # Non-Perl commands run unchanged, and say so rather than pretending.
     fallback, seeded = perl_seeded_command(["/bin/echo"], 42, ["hi"])
     assert seeded is False
     assert fallback == ["/bin/echo", "hi"]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Empty command"):
         perl_seeded_command([], 1)
 
     # Hash order must be pinned too; srand alone is not enough.
@@ -3805,7 +3815,8 @@ def test_read_ss_cons_requires_a_reference_structure(tmp_path: Path) -> None:
     annotated = tmp_path / "annotated.stk"
     annotated.write_text("# STOCKHOLM 1.0\nseqA ACGU\nseqB ACGA\n#=GC SS_cons <<>>\n//\n", encoding="utf-8")
     structure, n_seq = read_ss_cons(annotated)
-    assert structure == "<<>>" and n_seq == 2
+    assert structure == "<<>>"
+    assert n_seq == 2
 
 
 def test_scaffold_marks_missed_domains_and_unexplained_loci() -> None:
@@ -3877,8 +3888,9 @@ def test_shipped_jevg_truth_file_is_fully_curated() -> None:
 
     # Spans are ordered, non-overlapping and within the alignment.
     spans = sorted((e.start, e.end) for e in truth)
-    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:], strict=False))
-    assert spans[0][0] >= 1 and spans[-1][1] <= 711
+    assert all(a[1] < b[0] for a, b in itertools.pairwise(spans))
+    assert spans[0][0] >= 1
+    assert spans[-1][1] <= 711
 
     # No placeholders survive, so the benchmark accepts it.
     try:
@@ -3946,8 +3958,8 @@ def test_threshold_sweep_tightening_reduces_null_survivors(tmp_path: Path) -> No
         alifoldz_grid=[-1.0, -3.0],
         base=_sweep_base(),
     )
-    loose = [p for p in points if p.alifoldz == -1.0][0]
-    strict = [p for p in points if p.alifoldz == -3.0][0]
+    loose = next(p for p in points if p.alifoldz == -1.0)
+    strict = next(p for p in points if p.alifoldz == -3.0)
     assert loose.null_mean > strict.null_mean
     assert loose.fdr > strict.fdr
 
@@ -4343,7 +4355,8 @@ def test_plan_writes_subsets_that_preserve_columns(tmp_path: Path) -> None:
 
     alignment = _envelope_alignment()
     rows = plan(alignment, sizes=[2, 3], targets=[0.4, 0.8], max_subsets=100, seed=1)
-    assert rows and all(row["label"].startswith("n") for row in rows)
+    assert rows
+    assert all(row["label"].startswith("n") for row in rows)
 
     subset = Subset(names=tuple(rows[0]["names"].split(";")), identity=rows[0]["identity"])
     path = tmp_path / "subset.stk"
@@ -4368,7 +4381,7 @@ def test_shipped_denvg_truth_file_is_the_held_out_test_set() -> None:
     assert all(e.curated for e in truth)
 
     spans = sorted((e.start, e.end) for e in truth)
-    assert all(a[1] < b[0] for a, b in zip(spans, spans[1:], strict=False))
+    assert all(a[1] < b[0] for a, b in itertools.pairwise(spans))
     assert spans[-1][1] <= 488
 
     text = read_text(Path("resources/benchmark/denvg_3utr_elements.tsv"))
@@ -4702,3 +4715,441 @@ def test_refold_matches_refold_pl_where_it_is_installed(tmp_path: Path) -> None:
         env=subprocess_env(),
     )
     assert mine.stdout == folded.stdout
+
+
+# --- fold_region -------------------------------------------------------------
+#
+# The screen reports the best-scoring window of a locus, which can be shorter
+# than the element. This folds and plots an arbitrary span for curation, so it
+# has to reproduce the workflow's own preprocessing and RNAalifold call.
+
+
+FOLD_REGION_ALIGNMENT = "\n".join(
+    [
+        "# STOCKHOLM 1.0",
+        "#=GF ID region_source",
+        "seqA GGGCUAGCUAGGCAUCGAUCGGCUAGCUAGCCGAUCG",
+        "seqB GGGCUAGCUAGGCAUCGAUC-GCUAGCUAGCCGAUCG",
+        "seqC GGGCUAGCAAGGCAUCGAUCGGCUAGCUAGCCGAUCG",
+        "//",
+        "",
+    ]
+)
+
+
+def test_slice_alignment_takes_inclusive_one_based_columns() -> None:
+    from rnaconsnake.tools.alignment_io import Alignment
+    from rnaconsnake.tools.fold_region import slice_alignment
+
+    alignment = Alignment(order=["a", "b"], seqs={"a": "ACGUACGU", "b": "ACGU--GU"})
+    region = slice_alignment(alignment, 2, 5)
+    assert region.seqs == {"a": "CGUA", "b": "CGU-"}
+    assert region.order == ["a", "b"]
+    # The whole alignment is a legal span.
+    assert slice_alignment(alignment, 1, 8).seqs == alignment.seqs
+
+
+def test_slice_alignment_rejects_spans_outside_the_alignment() -> None:
+    from rnaconsnake.tools.alignment_io import Alignment
+    from rnaconsnake.tools.fold_region import slice_alignment
+
+    alignment = Alignment(order=["a"], seqs={"a": "ACGUACGU"})
+    for start, end in [(0, 4), (1, 9), (5, 4)]:
+        with pytest.raises(ValueError, match="outside the alignment"):
+            slice_alignment(alignment, start, end)
+
+
+def test_write_stockholm_round_trips_through_the_reader(tmp_path: Path) -> None:
+    from rnaconsnake.tools.alignment_io import Alignment, read_stockholm_alignment
+    from rnaconsnake.tools.fold_region import write_stockholm
+
+    alignment = Alignment(order=["a", "b"], seqs={"a": "ACGU", "b": "AC-U"})
+    path = tmp_path / "region.stk"
+    write_stockholm(alignment, path, "region_1_4")
+    assert "#=GF ID region_1_4" in read_text(path)
+    back = read_stockholm_alignment(path)
+    assert back.order == alignment.order
+    assert back.seqs == alignment.seqs
+
+
+def _fold_region_tools(bin_dir: Path) -> list[str]:
+    """Point every external tool at the fakes, by path rather than via PATH."""
+    return [
+        "--rnaalifold",
+        str(bin_dir / "RNAalifold"),
+        "--rnaz",
+        str(bin_dir / "RNAz"),
+        "--alifoldz",
+        str(bin_dir / "alifoldz.pl"),
+        "--eslreformat",
+        str(bin_dir / "esl-reformat"),
+        "--ps2eps",
+        str(bin_dir / "ps2eps"),
+        "--epstopdf",
+        str(bin_dir / "epstopdf"),
+    ]
+
+
+def test_fold_region_folds_plots_and_scores_a_span(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    write_fake_postprocess_tools(bin_dir)
+    alignment = tmp_path / "source.stk"
+    alignment.write_text(FOLD_REGION_ALIGNMENT, encoding="utf-8")
+    outdir = tmp_path / "out"
+
+    result = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.fold_region",
+            "--alignment",
+            str(alignment),
+            "--start",
+            "5",
+            "--end",
+            "24",
+            "--output-dir",
+            str(outdir),
+            "--label",
+            "elem",
+            *_fold_region_tools(bin_dir),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "elem: 5-24 (20 cols)" in result.stdout
+    # The extracted span, the workflow's cleanup, the fold and both plots.
+    assert (outdir / "elem.region.stk").is_file()
+    assert (outdir / "elem.stk").is_file()
+    assert (outdir / "elem.RNAalifold_results.stk").is_file()
+    for produced in ["elem_aln.ps", "elem_ss.ps", "elem_aln.eps", "elem_aln.pdf", "elem_ss.pdf"]:
+        assert (outdir / produced).is_file(), produced
+    # The undeclared stray plot neither survives in outdir nor escapes into the
+    # directory the tool was invoked from: alifoldz.pl drops one too.
+    assert not (outdir / "alirna.ps").exists()
+    assert not (Path.cwd() / "alirna.ps").exists()
+    assert not (tmp_path / "alirna.ps").exists()
+
+    payload = json.loads(read_text(outdir / "elem.scores.json"))
+    assert payload["label"] == "elem"
+    assert payload["start"] == 5
+    assert payload["end"] == 24
+    assert payload["columns"] == 20
+    assert payload["n_seq_after_cleanup"] >= 1
+    # Scores for this exact span, for comparison with what the screen reported.
+    assert payload["rnazprob"] == "0.95"
+    assert payload["alifoldzscore"] == "-3.21"
+
+
+def test_fold_region_records_a_crashed_alifoldz_as_na(tmp_path: Path) -> None:
+    """The 9999 sentinel is AlifoldZ's running-minimum initialiser, not a score."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    write_fake_postprocess_tools(bin_dir)
+    sentinel = bin_dir / "alifoldz.pl"
+    sentinel.write_text(
+        "#!/usr/bin/env python3\nimport sys\n_ = sys.stdin.read()\nprint('9999')\n",
+        encoding="utf-8",
+    )
+    sentinel.chmod(0o755)
+
+    alignment = tmp_path / "source.stk"
+    alignment.write_text(FOLD_REGION_ALIGNMENT, encoding="utf-8")
+    outdir = tmp_path / "out"
+    subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.fold_region",
+            "--alignment",
+            str(alignment),
+            "--start",
+            "1",
+            "--end",
+            "37",
+            "--output-dir",
+            str(outdir),
+            "--label",
+            "elem",
+            *_fold_region_tools(bin_dir),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    assert json.loads(read_text(outdir / "elem.scores.json"))["alifoldzscore"] == "NA"
+
+
+def test_fold_region_skips_scoring_on_request(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    write_fake_postprocess_tools(bin_dir)
+    alignment = tmp_path / "source.stk"
+    alignment.write_text(FOLD_REGION_ALIGNMENT, encoding="utf-8")
+    outdir = tmp_path / "out"
+
+    subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.fold_region",
+            "--alignment",
+            str(alignment),
+            "--start",
+            "1",
+            "--end",
+            "37",
+            "--output-dir",
+            str(outdir),
+            "--label",
+            "elem",
+            "--no-scores",
+            *_fold_region_tools(bin_dir),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    payload = json.loads(read_text(outdir / "elem.scores.json"))
+    assert "rnazprob" not in payload
+    assert not (outdir / "elem.rnaz.txt").exists()
+
+
+# --- analysis aids at the command line ---------------------------------------
+#
+# threshold_sweep, sensitivity_envelope and benchmark_scaffold run outside the
+# DAG, so their entry points are the only interface anyone uses.
+
+
+def test_threshold_sweep_cli_writes_a_grid(tmp_path: Path) -> None:
+    real = _write_summary_csv(tmp_path / "real.csv", _candidate_rows(0.97, -4.0, "2"))
+    null = _write_summary_csv(tmp_path / "null.csv", _candidate_rows(0.20, 0.5, "0"))
+    reference = tmp_path / "truth.tsv"
+    reference.write_text(
+        "element_id\telement_class\talignment\tstart\tend\tnotes\ne1\txrRNA\taln\t1\t100\tfirst\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "sweep.tsv"
+
+    result = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.threshold_sweep",
+            "--arm-input",
+            f"real:100:{real}",
+            "--arm-input",
+            f"null_000:100:{null}",
+            "--output",
+            str(output),
+            "--rnaz-grid",
+            "0.5,0.9",
+            "--alifoldz-grid=-1,-2",
+            "--reference",
+            str(reference),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "4 threshold combinations" in result.stdout
+    lines = read_text(output).splitlines()
+    header = next(line for line in lines if not line.startswith("#"))
+    assert "rnaz_prob" in header
+    assert "alifoldz" in header
+    # One row per grid point, plus the recovery column the reference adds.
+    assert len([line for line in lines if line.startswith("0.")]) == 4
+    assert "recovered" in header
+
+
+def test_threshold_sweep_reads_reference_spans_and_ignores_labels(tmp_path: Path) -> None:
+    from rnaconsnake.tools.threshold_sweep import read_reference_spans
+
+    path = tmp_path / "ref.tsv"
+    path.write_text(
+        "# a comment line\n"
+        "element_id\telement_class\talignment\tstart\tend\tnotes\n"
+        "e1\txrRNA\taln\t10\t20\tfine\n"
+        "e2\tDB\taln\tTBD\tTBD\tuncurated\n",
+        encoding="utf-8",
+    )
+    # The uncurated row has no coordinates, so it contributes no span.
+    assert read_reference_spans(path) == [(10, 20)]
+
+
+def test_sensitivity_envelope_cli_writes_subsets_and_a_manifest(tmp_path: Path) -> None:
+    alignment = tmp_path / "aln.stk"
+    alignment.write_text(
+        "# STOCKHOLM 1.0\n"
+        "#=GF ID envelope\n"
+        "a ACGUACGUACGUACGUACGU\n"
+        "b ACGUACGUACGUACGUACGA\n"
+        "c AGGUAGGUAGGUAGGUAGGU\n"
+        "d UCAUUCAUUCAUUCAUUCAU\n"
+        "//\n",
+        encoding="utf-8",
+    )
+    outdir = tmp_path / "subsets"
+    manifest = tmp_path / "manifest.tsv"
+
+    result = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.sensitivity_envelope",
+            "--alignment",
+            str(alignment),
+            "--output-dir",
+            str(outdir),
+            "--manifest",
+            str(manifest),
+            "--sizes",
+            "2,3",
+            "--identities",
+            "0.4,0.8",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "subsets spanning" in result.stdout
+    text = read_text(manifest)
+    assert text.startswith("# sensitivity envelope subsets of")
+    rows = [line for line in text.splitlines() if not line.startswith("#")][1:]
+    assert rows, "the manifest lists no subsets"
+    # Every manifest row has an alignment written for it, with those sequences.
+    from rnaconsnake.tools.alignment_io import read_stockholm_alignment
+
+    for row in rows:
+        label, n_seq, _identity, names = row.split("\t")
+        subset = outdir / f"{label}.stk"
+        assert subset.is_file(), label
+        written = read_stockholm_alignment(subset)
+        assert written.order == names.split(";")
+        assert written.n_seq == int(n_seq)
+        # Columns are preserved, so coordinates still mean the same thing.
+        assert written.length == 20
+
+
+def test_benchmark_scaffold_cli_drafts_a_truth_file(tmp_path: Path) -> None:
+    alignment = tmp_path / "aln.stk"
+    alignment.write_text(
+        "# STOCKHOLM 1.0\n"
+        "#=GF ID scaffold\n"
+        "a GGGGAAAACCCCAAAAAAAAGGGGGAAAAACCCCC\n"
+        "b GGGGAAAACCCCAAAAAAAAGGGGGAAAAACCCCC\n"
+        "#=GC SS_cons ((((....))))........(((((.....)))))\n"
+        "//\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "scaffold.tsv"
+
+    result = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.benchmark_scaffold",
+            "--alignment",
+            str(alignment),
+            "--alignment-id",
+            "scaffold",
+            "--output",
+            str(output),
+            "--min-width",
+            "8",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "consensus domains" in result.stdout
+    # The labels are placeholders on purpose; saying so is part of the contract.
+    assert "Labels are placeholders" in result.stdout
+    text = read_text(output)
+    assert "element_id\telement_class\talignment\tstart\tend\tnotes" in text
+    rows = [line for line in text.splitlines() if line and not line.startswith(("#", "element_id"))]
+    assert len(rows) == 2, text
+    for row in rows:
+        assert row.split("\t")[2] == "scaffold"
+
+    # ...and the benchmark refuses the draft until a curator has been through:
+    # the coordinates are filled in, so it is the labels that block it.
+    from rnaconsnake.tools.benchmark import BenchmarkError, evaluate, read_truth
+
+    truth = read_truth(output, "scaffold")
+    assert all(element.curated for element in truth)
+    with pytest.raises(BenchmarkError, match="placeholder"):
+        evaluate(truth, [], min_overlap_fraction=0.5, allow_uncurated=False)
+
+
+# --- progress rendering ------------------------------------------------------
+#
+# The progress path wraps the snakemake subprocess, so a bug here stalls or
+# garbles a run that is otherwise fine.
+
+
+def test_should_use_progress_follows_the_flags_and_the_terminal(monkeypatch) -> None:
+    from argparse import Namespace
+
+    monkeypatch.setattr(cli, "tqdm", object())
+    assert cli.should_use_progress(Namespace(progress=True, no_progress=False)) is True
+    # --no-progress wins over --progress.
+    assert cli.should_use_progress(Namespace(progress=True, no_progress=True)) is False
+
+    # Without tqdm there are no bars to draw, whatever was asked for.
+    monkeypatch.setattr(cli, "tqdm", None)
+    assert cli.should_use_progress(Namespace(progress=True, no_progress=False)) is False
+
+
+def test_run_with_progress_counts_finished_jobs_and_passes_output_through(tmp_path: Path, capsys) -> None:
+    """The wrapper must forward every line it does not consume, and return the
+    child's exit code -- a swallowed error message is worse than no bars."""
+    script = tmp_path / "fake_snakemake.py"
+    script.write_text(
+        "print('Building DAG of jobs...')\n"
+        "print('Job stats:')\n"
+        "print('job      count')\n"
+        "print('RNALalifold    2')\n"
+        "print('all      1')\n"
+        "print('total    3')\n"
+        "print('')\n"
+        "print('Finished jobid: 1 (Rule: RNALalifold)')\n"
+        "print('Finished jobid: 2 (Rule: RNALalifold)')\n"
+        "print('a message worth seeing')\n",
+        encoding="utf-8",
+    )
+    assert cli.run_with_progress([PYTHON, str(script)], subprocess_env()) == 0
+    captured = capsys.readouterr()
+    assert "a message worth seeing" in captured.out + captured.err
+    assert "Building DAG of jobs..." in captured.out + captured.err
+
+
+def test_run_with_progress_returns_the_childs_exit_code(tmp_path: Path) -> None:
+    script = tmp_path / "failing.py"
+    script.write_text("import sys\nprint('boom')\nsys.exit(3)\n", encoding="utf-8")
+    assert cli.run_with_progress([PYTHON, str(script)], subprocess_env()) == 3
+
+
+def test_parse_job_stats_ignores_the_aggregate_rows() -> None:
+    total, counts = cli.parse_job_stats_lines(
+        ["job      count", "RNALalifold   2", "all       1", "clean     1", "total     3"]
+    )
+    assert total == 3
+    # `all` and `clean` are not real work; counting them would inflate the bars.
+    assert counts == {"RNALalifold": 2}

@@ -24,7 +24,7 @@ WORKFLOW_SOURCES = {
 }
 
 
-class build_py(_build_py):
+class build_py(_build_py):  # noqa: N801 - matches the setuptools command it overrides
     def run(self):
         super().run()
         for src, relative_dest in WORKFLOW_SOURCES.items():

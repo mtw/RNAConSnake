@@ -39,8 +39,7 @@ def write_stockholm(alignment: Alignment, path: Path, identifier: str) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         handle.write("# STOCKHOLM 1.0\n")
         handle.write(f"#=GF ID {identifier}\n")
-        for name in alignment.order:
-            handle.write(f"{name} {alignment.seqs[name]}\n")
+        handle.writelines(f"{name} {alignment.seqs[name]}\n" for name in alignment.order)
         handle.write("//\n")
 
 
@@ -74,8 +73,8 @@ def preprocess(source: Path, workdir: Path, label: str, gapratio: float, max_n: 
 def fold_and_plot(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]) -> Path:
     """RNAalifold with the workflow's parameters, then EPS and PDF."""
     run_checked(
-        shlex.split(tools["rnaalifold"])
-        + [
+        [
+            *shlex.split(tools["rnaalifold"]),
             "-t4",
             "--aln",
             "--color",
@@ -106,18 +105,18 @@ def fold_and_plot(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]
     for suffix in ["_ali.out", "_dp.ps", "_aln.ps", "_ss.ps"]:
         normalize_rnaalifold_side_output(outdir, outdir / f"{label}{suffix}", suffix)
     for base in ["_aln", "_ss"]:
-        run_checked(shlex.split(tools["ps2eps"]) + [f"{label}{base}.ps"], cwd=str(outdir))
-        run_checked(shlex.split(tools["epstopdf"]) + [f"{label}{base}.eps"], cwd=str(outdir))
+        run_checked([*shlex.split(tools["ps2eps"]), f"{label}{base}.ps"], cwd=str(outdir))
+        run_checked([*shlex.split(tools["epstopdf"]), f"{label}{base}.eps"], cwd=str(outdir))
     return result_stk
 
 
 def score(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]) -> dict:
     """RNAz and AlifoldZ on this exact span, for comparison with the screen."""
     clustal = outdir / f"{label}.aln"
-    run_checked(shlex.split(tools["eslreformat"]) + ["clustal", str(cleaned)], stdout_path=clustal)
+    run_checked([*shlex.split(tools["eslreformat"]), "clustal", str(cleaned)], stdout_path=clustal)
 
     rnaz_txt = outdir / f"{label}.rnaz.txt"
-    run_checked(shlex.split(tools["rnaz"]) + ["-d", "-n", str(clustal)], stdout_path=rnaz_txt)
+    run_checked([*shlex.split(tools["rnaz"]), "-d", "-n", str(clustal)], stdout_path=rnaz_txt)
     rnaz_json = outdir / f"{label}.rnaz.json"
     run_checked(
         [
@@ -134,13 +133,20 @@ def score(cleaned: Path, outdir: Path, label: str, tools: dict[str, str]) -> dic
     scores = json.loads(rnaz_json.read_text(encoding="utf-8"))
 
     with open(clustal, encoding="utf-8") as handle:
+        # In outdir, not wherever the user invoked this: alifoldz.pl shells out
+        # to RNAalifold without --noPS and drops an undeclared "alirna.ps" into
+        # the directory it runs in.
         result = subprocess.run(
-            shlex.split(tools["alifoldz"]) + ["-f", "-t", "0.0"],
+            [*shlex.split(tools["alifoldz"]), "-f", "-t", "0.0"],
             stdin=handle,
             capture_output=True,
             text=True,
             check=False,
+            cwd=str(outdir),
         )
+    stray = outdir / "alirna.ps"
+    if stray.exists():
+        stray.unlink()
     lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
     value = lines[-1] if lines else ""
     scores["alifoldzscore"] = "NA" if (result.returncode != 0 or value == "9999") else value

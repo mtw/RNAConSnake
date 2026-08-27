@@ -70,13 +70,35 @@ select = [
   "B",    # bugbear
   "C4",   # comprehensions
   "SIM",  # simplifications
+  "RUF",  # ruff's own checks
+  "PIE",  # misc lints
+  "PERF",  # obvious performance mistakes
+  "PT",   # pytest style
+  "RET",  # return-statement shape
+  "N",    # naming
+  "PGH",  # blanket noqa/type-ignore
+  "FURB",  # modern idioms
+  "TID",  # tidy imports
+  "C90",  # cyclomatic complexity, capped below
 ]
 ignore = [
   # Both sites it flags here fold a multi-line if/else into a ~110-column
   # ternary, which is shorter but not clearer.
   "SIM108",
+  # Where a loop body is one expression, ruff already rewrote it. What is
+  # left builds multi-line rows, and reads better as a loop.
+  "PERF401",
 ]
 
+[tool.ruff.lint.mccabe]
+# Today's worst function. The ceiling is a ratchet: nothing new may exceed
+# what the orchestration entry points already cost.
+max-complexity = 23
+
+[tool.ruff.lint.per-file-ignores]
+# pytest rules are about tests; asserts in the library are not test asserts.
+"src/*" = ["PT"]
+"setup.py" = ["PT"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
