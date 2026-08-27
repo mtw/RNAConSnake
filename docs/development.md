@@ -180,7 +180,8 @@ alignments, in both constraint modes. Where the two differ, `refold.pl` fails
 rather than disagreeing — see the module docstring. The `RNA` module is
 imported only when folding; the constraint logic imports nothing.
 
-The module and the ViennaRNA binaries must report the same version:
+ViennaRNA must be 2.7 or newer, and the module and the binaries must report
+the same version:
 `RNAcs --check-deps` compares them and refuses a mixed toolchain, since the
 consensus structure comes from `RNAalifold` and the refold from the module.
 Running `snakemake` directly bypasses that preflight — `results/versions.yaml`

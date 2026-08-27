@@ -208,9 +208,10 @@ and `cmcalibrate`.
 
 Refolding needs the **ViennaRNA Python module** (`import RNA`) in the same
 environment, not a binary: it replaced `refold.pl` and the `RNAfold -C` that
-script fed. The module and the ViennaRNA binaries must come from the **same
-release** — the consensus structure comes from the binaries and the refold from
-the module, and one run must not mix two builds' energy parameters.
+script fed. ViennaRNA **2.7 or newer** is required, and the module and the
+binaries must come from the **same release** — the consensus structure comes
+from the binaries and the refold from the module, and one run must not mix two
+builds' energy parameters.
 `RNAcs --check-deps` compares them and refuses to run a mixed toolchain;
 `results/versions.yaml` records the verdict.
 

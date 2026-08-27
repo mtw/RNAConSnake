@@ -231,6 +231,11 @@ def parse_args() -> argparse.Namespace:
 # Python module, and must report the same version as it.
 VIENNARNA_BINARIES = ("rnalalifold", "rnaalifold")
 
+# The oldest ViennaRNA this runs on. The shipped configuration was locked
+# against 2.7.2, and PyPI publishes wheels only for 2.7.x, so an older bound
+# would be one nothing can install anyway.
+MINIMUM_VIENNARNA = (2, 7)
+
 VERSION_NUMBER = re.compile(r"\d+\.\d+(?:\.\d+)*")
 
 
@@ -298,6 +303,9 @@ def check_dependencies(
             missing.append(command if command == executable else f"{executable} (from {name}: {command})")
 
     conflicts = viennarna_version_conflicts(bindings, configured_tools)
+    outdated = viennarna_too_old(bindings)
+    if outdated:
+        conflicts.insert(0, outdated)
 
     if missing or conflicts:
         if missing:
@@ -305,7 +313,7 @@ def check_dependencies(
             for dep in missing:
                 print(f"  - {dep}", file=sys.stderr)
         if conflicts:
-            print("ViennaRNA version mismatch:", file=sys.stderr)
+            print("ViennaRNA version problem:", file=sys.stderr)
             for conflict in conflicts:
                 print(f"  - {conflict}", file=sys.stderr)
             print(
@@ -348,6 +356,19 @@ def parse_version(text: str | None) -> str:
     """The first dotted version number in ``text`` (``RNAalifold 2.7.2`` -> ``2.7.2``)."""
     match = VERSION_NUMBER.search(text or "")
     return match.group(0) if match else ""
+
+
+def version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split(".")) if version else ()
+
+
+def viennarna_too_old(bindings: str | None) -> str:
+    """Complaint about a ViennaRNA older than RNAcs supports, or ``""``."""
+    found = version_tuple(parse_version(bindings))
+    if not found or found >= MINIMUM_VIENNARNA:
+        return ""
+    minimum = ".".join(str(part) for part in MINIMUM_VIENNARNA)
+    return f"ViennaRNA {parse_version(bindings)} is older than the {minimum} this needs"
 
 
 def probe_version(command: str) -> str:

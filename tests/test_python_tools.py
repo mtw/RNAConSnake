@@ -2150,6 +2150,34 @@ def test_viennarna_binaries_must_be_the_same_build_as_the_module(tmp_path: Path)
     assert cli.viennarna_version_conflicts("2.6.4", missing) == []
 
 
+def test_viennarna_below_the_supported_minimum_is_refused() -> None:
+    """The configuration was locked against 2.7.2, and PyPI publishes wheels
+    only for 2.7.x, so an older ViennaRNA is neither tested nor installable."""
+    assert cli.MINIMUM_VIENNARNA == (2, 7)
+    assert "2.6.4" in cli.viennarna_too_old("2.6.4")
+    assert cli.viennarna_too_old("2.7.0") == ""
+    assert cli.viennarna_too_old("3.0") == ""
+    # Nothing to judge is not a complaint.
+    assert cli.viennarna_too_old(None) == ""
+    assert cli.viennarna_too_old("unknown") == ""
+
+
+def test_check_deps_refuses_an_outdated_viennarna(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "viennarna_bindings_version", lambda: "2.6.4")
+    monkeypatch.setattr(cli, "viennarna_version_conflicts", lambda bindings, tools=None: [])
+    assert cli.check_dependencies() == 2
+    assert "older than the 2.7" in capsys.readouterr().err
+
+
+def test_the_declared_viennarna_floor_matches_the_preflight() -> None:
+    """One number, two places: the dev extra and the runtime check."""
+    import re as _re
+
+    declared = _re.search(r'"ViennaRNA>=(\d+)\.(\d+)', read_text(Path("pyproject.toml")))
+    assert declared, "the dev extra no longer pins a ViennaRNA floor"
+    assert (int(declared.group(1)), int(declared.group(2))) == cli.MINIMUM_VIENNARNA
+
+
 def test_check_deps_fails_on_a_viennarna_version_mismatch(monkeypatch, capsys) -> None:
     """A mixed toolchain is a refusal, not a warning: a calibrated result could
     not be reproduced from the versions the run records."""
@@ -2161,7 +2189,7 @@ def test_check_deps_fails_on_a_viennarna_version_mismatch(monkeypatch, capsys) -
     )
     assert cli.check_dependencies() == 2
     captured = capsys.readouterr()
-    assert "ViennaRNA version mismatch" in captured.err
+    assert "ViennaRNA version problem" in captured.err
     assert "same ViennaRNA release" in captured.err
 
 

@@ -103,8 +103,8 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   module, compares its version against every ViennaRNA binary, and refuses a
   mixed toolchain -- the consensus comes from the binaries and the refold from
   the module, so two builds would mean two sets of energy parameters in one
-  run. `results/versions.yaml` records the module's version beside the
-  binaries' and states whether they match.
+  run. The supported minimum is ViennaRNA 2.7. `results/versions.yaml` records
+  the module's version beside the binaries' and states whether they match.
 - **The command-line tool is now `RNAcs`.** `rnaconsnake-run` remains a
   deprecated alias.
 - **Default behaviour changed in three places**, each altering results relative
