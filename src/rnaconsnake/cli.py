@@ -107,7 +107,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--input-alignment",
-        help="Run the workflow on an arbitrary input Stockholm alignment file instead of data/<sample>.stk.",
+        help="Input alignment to screen, in Stockholm (.stk) or Clustal (.aln) format. Required.",
     )
     parser.add_argument(
         "--export-bundle",

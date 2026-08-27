@@ -319,6 +319,21 @@ def test_cli_show_tool_paths_reports_configured_commands() -> None:
     assert "command: python3 -m rnaconsnake.tools.legacy_postprocess" in result.stdout
 
 
+def test_cli_help_describes_no_local_only_layout() -> None:
+    """Help text is the first documentation a user reads; a `data/<sample>.stk`
+    convention that the repository does not ship sends them looking for a
+    directory that only ever existed on one machine."""
+    result = subprocess.run(
+        [PYTHON, "-m", "rnaconsnake.cli", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=subprocess_env(),
+    )
+    for ignored in ["data/", "runs/", "configuration_lock"]:
+        assert ignored not in result.stdout, f"--help points at {ignored}, which no clone has"
+
+
 def test_cli_requires_input_alignment_for_run() -> None:
     result = subprocess.run(
         [PYTHON, "-m", "rnaconsnake.cli", "--cores", "1"],
