@@ -110,8 +110,7 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - **Default behaviour changed in three places**, each altering results relative
   to earlier runs: `alifoldz_seed` is now set; `dereplicate.max_container_width`
   defaults to 120; `strip_aln` upper-cases sequences. The cascade thresholds and
-  representative rule are recorded in
-  [`docs/configuration_lock.md`](docs/configuration_lock.md).
+  representative rule are locked in `config.yaml`, and a test pins them.
 - **Ruff is now the linter and formatter**, enforced in CI (`ruff check`,
   `ruff format --check`) and configured in `pyproject.toml` at 110 columns. The
   tree was formatted in one pass; the lint fixes it required were unused

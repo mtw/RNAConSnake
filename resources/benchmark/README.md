@@ -24,8 +24,7 @@ small hairpins immediately 3' of xrRNA1 and xrRNA2 — and are flagged as such i
 the file.
 
 The screen configuration (representative rule and cascade thresholds) was
-chosen against this set; see
-[`../../docs/configuration_lock.md`](../../docs/configuration_lock.md).
+chosen against this set, and has been locked in `config.yaml` since.
 
 ### `denvg_3utr_elements.tsv` — held-out test set
 

@@ -37,8 +37,8 @@ cm_alifoldz_threshold: -2.0
 # Filter thresholds used when turning arm counts into q-values. The defaults
 # mirror the cm_* thresholds so the calibrated cascade matches the screen.
 calibration:
-  # Locked 2026-08-23 on the JEV group, before the dengue group was evaluated;
-  # see docs/configuration_lock.md. Do not tune against DENVG results.
+  # Locked 2026-08-23 on the JEV group, before the dengue group was evaluated.
+  # Do not tune against DENVG results.
   rnaz_prob_threshold: 0.8
   alifoldz_threshold: -1.5
   rscape_min_pairs: 1

@@ -3,8 +3,7 @@
 # curated 2026-08-24 by M. Wolfinger. 4/4 labelled.
 #
 # The screen configuration was locked on the JEV group BEFORE these labels
-# were used; see docs/configuration_lock.md. This set is evaluated once and
-# not tuned against.
+# were used. This set is evaluated once and not tuned against.
 #
 # Coordinates are 1-based inclusive columns of
 # examples/all_DENVG_3UTR.relabel.stk (4 RefSeq serotypes, MPI 0.71).

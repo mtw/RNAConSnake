@@ -3,8 +3,8 @@
 # curation status: 9/9 labelled - COMPLETE.
 #
 # Coordinates are 1-based inclusive alignment columns of
-# examples/all_JEVG_3UTR.relabel.stk. Curated by M. Wolfinger against the
-# domain-span folds in jevg_benchmark_review/.
+# examples/all_JEVG_3UTR.relabel.stk. Curated by M. Wolfinger against
+# per-domain folds of the reference structure.
 #
 # HP1 and HP2 were not previously annotated.
 # xrRNA1 and xrRNA2 form pseudoknots that the ViennaRNA model cannot

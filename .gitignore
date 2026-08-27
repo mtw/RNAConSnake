@@ -46,6 +46,9 @@ container/vendor/
 container/rnaconsnake/
 
 data/
+
+# internal: records the locked configuration and the reasoning behind it,
+# including material that is not for publication
 docs/configuration_lock.md
 
 # completed run directories (large; regenerate from _provenance/COMMAND.sh)

@@ -90,9 +90,9 @@ test.
   scope, and the export bundle is the interface downstream consumers read.
 - **Calibration counts on de-replicated loci, never on raw windows**, and using
   the same grouping the reported table uses.
-- **Configuration is locked.** `docs/configuration_lock.md` records the
-  representative rule and cascade thresholds, fixed on one clade before another
-  was evaluated. Changing those values changes every published number.
+- **Configuration is locked.** The representative rule and cascade thresholds
+  in `config.yaml` were fixed on one clade before another was evaluated, and a
+  test pins them. Changing those values changes every published number.
 - **Non-numeric sentinels stay non-numeric.** A failed AlifoldZ is `NA`, never
   `0.0`; a plausible-looking number is indistinguishable from a real score.
 

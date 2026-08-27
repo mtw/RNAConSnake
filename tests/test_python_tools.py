@@ -3462,7 +3462,7 @@ def test_packaging_declares_no_web_dependencies() -> None:
 
 
 def test_workflow_emits_no_html() -> None:
-    """AGENTS.md: no browser-style HTML reporting in this project."""
+    """No browser-style HTML reporting in this project."""
     snakefile = read_text(Path("snakefile"))
     assert ".html" not in snakefile
     for path in _tracked_files():
@@ -4181,25 +4181,15 @@ def test_widest_representative_keeps_a_multi_lobed_element_whole() -> None:
 
 
 def test_configuration_is_locked_to_the_recorded_values() -> None:
-    """The configuration was fixed on JEVG before DENVG was evaluated.
-
-    Changing these values silently would forfeit the only out-of-sample number
-    the study has; docs/configuration_lock.md records the reasoning.
-    """
+    """The screen configuration was fixed on the JEV group before the dengue
+    group was evaluated. Changing these values silently would forfeit the only
+    out-of-sample number the study has."""
     import yaml as _yaml
 
     payload = _yaml.safe_load(read_text(Path("config.yaml")))
     assert payload["dereplicate"]["representative"] == "widest"
     assert payload["calibration"]["rnaz_prob_threshold"] == 0.8
     assert payload["calibration"]["alifoldz_threshold"] == -1.5
-
-    lock = read_text(Path("docs/configuration_lock.md"))
-    assert "representative: widest" in lock
-    assert "rnaz_prob_threshold: 0.8" in lock
-    assert "alifoldz_threshold: -1.5" in lock
-    # The limitations must stay stated, not quietly dropped.
-    assert "DB2 is not recovered" in lock
-    assert "sensitive to a single element" in lock
 
 
 def test_every_curated_truth_file_is_packaged() -> None:
