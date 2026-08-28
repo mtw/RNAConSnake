@@ -37,6 +37,12 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   since the constrained fold runs in-process. Verified byte-identical to
   `refold.pl | RNAfold --noPS -C` over 38 windows from two flavivirus
   alignments, in both constraint modes.
+- **The AlifoldZ zero-variance guard ships as a patch**
+  (`container/patches/alifoldz-zero-variance.patch`), applied by
+  `prepare-context.sh`. It was previously a local modification of
+  `alifoldz.pl`, so the image could not be rebuilt from published sources
+  alone. Without it, a candidate whose shuffles all fold to the same energy
+  divides by zero and dies; with it, that candidate is recorded as unscored.
 - **Reproducibility artefacts:** `results/versions.yaml`, `CITATION.cff`,
   `environment.yaml`, a `profiles/test/` CI profile, and a
   [container](container/README.md) pinning the whole toolchain — including

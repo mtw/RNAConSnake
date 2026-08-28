@@ -4477,13 +4477,15 @@ def test_public_container_dir_has_no_lab_tooling() -> None:
     """Host-specific job-distribution scripts are lab infrastructure and do not
     belong in a public repository."""
     names = {p.name for p in Path("container").iterdir() if p.is_file()}
+    # Third-party patches live in their own directory and are scanned below.
+    assert (Path("container") / "patches").is_dir()
     assert names == {
         "Dockerfile",
         "environment.container.yaml",
         "prepare-context.sh",
         "README.md",
     }
-    for path in Path("container").glob("*"):
+    for path in Path("container").rglob("*"):
         if path.is_file():
             text = path.read_text(encoding="utf-8", errors="ignore")
             for leak in ["/Users/mtw", "venus", "mercury"]:

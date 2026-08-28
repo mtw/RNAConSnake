@@ -1,0 +1,39 @@
+Guard AlifoldZ against a zero-variance shuffle set.
+
+alifoldz.pl divides the native MFE's distance from the shuffle mean by the
+shuffle standard deviation. On a candidate whose shuffles all fold to the same
+energy that deviation is zero, and the script dies with "Illegal division by
+zero" -- a Perl error on stderr, an empty result, and a workflow job that fails
+with nothing to explain it.
+
+With this guard it reports the condition and exits non-zero instead. The
+workflow already treats a non-result as `NA` (see extract-alifoldz), so the
+candidate is recorded as unscored rather than aborting the run or, worse,
+being given a plausible-looking number.
+
+Applies to alifoldz.pl from the RNAz sources:
+https://raw.githubusercontent.com/ViennaRNA/RNAz/master/perl/alifoldz.pl
+
+--- alifoldz.pl.orig
++++ alifoldz.pl
+@@ -769,9 +769,17 @@
+ 		}
+ 	  }
+ 		
+-	  $mean=calc_mean(\@samples);
+-	  $stdv=calc_stdv(\@samples);
+-	  $z=($native-$mean)/$stdv;
++	  eval {
++	  	$mean=calc_mean(\@samples);
++	  	$stdv=calc_stdv(\@samples);
++		die "Division by zero: mean=$mean, stdv=$stdv" if $stdv == 0;
++	  	$z=($native-$mean)/$stdv;
++	  };
++	  if ($@) {
++		print "**Error: $@";
++		print "0.0\n";
++		die;
++		}
+ 
+ 	  $mean=sprintf("%.2f",$mean);
+ 	  $stdv=sprintf("%.2f",$stdv);

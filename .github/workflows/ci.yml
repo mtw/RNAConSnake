@@ -99,9 +99,9 @@ jobs:
       - uses: actions/checkout@v4
 
       # Neither is on a package index, which is the whole reason the container
-      # exists. alifoldz.pl comes from upstream RNAz here; a local build may
-      # vendor a patched copy, so this tier tests the pipeline against the
-      # published tool rather than against a private variant.
+      # exists. alifoldz.pl comes from upstream RNAz and prepare-context.sh
+      # applies the repository's own patch to it, so this tier runs the same
+      # script the shipped image does.
       - name: Fetch the sources conda cannot supply
         run: |
           git clone --depth 1 https://github.com/mtw/SISSIz "$RUNNER_TEMP/SISSIz"

@@ -38,6 +38,15 @@ and must already be present on the build machine:
 | SISSIz source | clone [https://github.com/mtw/SISSIz](https://github.com/mtw/SISSIz); the build tree, not a binary |
 | `alifoldz.pl` | the **RNAz source tarball** (`perl/` directory) — absent from the conda package |
 
+`prepare-context.sh` applies
+[`patches/alifoldz-zero-variance.patch`](patches/alifoldz-zero-variance.patch)
+to whichever `alifoldz.pl` it is given, and says which it did. Without the
+guard, a candidate whose shuffles all fold to the same energy makes the script
+divide by zero and die with an unexplained Perl error; with it, the candidate
+is recorded as unscored. A copy that already carries the guard is left alone,
+so pointing `ALIFOLDZ` at either an upstream or an already-patched script
+produces the same image.
+
 `ps2eps` and `epstopdf` come from Debian inside the image and need no action.
 
 Override the locations if yours differ:
