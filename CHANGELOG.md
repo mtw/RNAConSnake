@@ -4,7 +4,7 @@ All notable changes to this project should be documented in this file.
 
 The format is based on Keep a Changelog, and this project aims to use Semantic Versioning.
 
-## [Unreleased]
+## [0.3.0] - 2026-08-28
 
 ### Added
 - **Null-model calibration arm** (`--null-arm`). Optionally reruns the *same*
@@ -44,9 +44,6 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   is on any package index.
 - Input format detection for the initial `RNALalifold` run: `.stk` uses `-f S`,
   `.aln` uses `-f C`.
-- The minimum Python is now **3.11**. `>=3.10` was never installable: snakemake 8
-  requires 3.11, so `pip install` failed outright on 3.10. A test now checks the
-  declared floor against what the dependencies actually support.
 
 ### Fixed
 - **Lower-case alignments hung the workflow indefinitely.** `refold.pl` matches
@@ -111,6 +108,9 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   the module's version beside the binaries' and states whether they match.
 - **The command-line tool is now `RNAcs`.** `rnaconsnake-run` remains a
   deprecated alias.
+- **The minimum Python is now 3.11.** `>=3.10` was never installable — snakemake
+  8 requires 3.11, so `pip install` failed outright there. A test compares the
+  declared floor against what the dependencies support.
 - **Default behaviour changed in three places**, each altering results relative
   to earlier runs: `alifoldz_seed` is now set; `dereplicate.max_container_width`
   defaults to 120; `strip_aln` upper-cases sequences. The cascade thresholds and
@@ -120,10 +120,17 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   with pycodestyle, pyflakes, import order, pyupgrade, bugbear,
   comprehensions, simplifications, ruff's own checks, pytest style (tests
   only), naming, performance, return shape, modern idioms, tidy imports and a
-  complexity ceiling set to today's worst function. The
-  tree was formatted in one pass; the lint fixes it required were unused
-  imports, import order, `zip(..., strict=)` on alignment rows, and a file
-  handle left unclosed in the tests.
+  complexity ceiling set to today's worst function. The tree was formatted in
+  one pass; the lint fixes it required were unused imports, import order,
+  `zip(..., strict=)` on alignment rows, and a file handle left unclosed in the
+  tests.
+- **Tests and CI.** 196 tests at 92% line coverage (measured with subprocess
+  tracing; the naive figure understates it, because most code runs through
+  spawned tools). CI lints, runs the suite on 3.11-3.13, and verifies that the
+  built sdist and wheel carry the workflow and every curated truth file. The
+  workflow tests drive the real Snakemake DAG against stubbed external tools,
+  including both arms of the calibration and the positive control; no test yet
+  runs the real toolchain, which the container exists to provide.
 - Internal cleanups: `SUMMARY_FIELDS` defined once and shared; `run_checked`
   uses `contextlib.ExitStack`; `normalize_rnaalifold_side_output` raises rather
   than silently no-oping; manifest rules share a helper; `refold_firstseq` and
