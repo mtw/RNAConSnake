@@ -196,10 +196,16 @@ Current release model:
 - root workflow files copied into the package at build time
 - ViennaRNA and legacy post-processing commands as external runtime dependencies
 
+Refolding already runs through the ViennaRNA Python bindings rather than
+`refold.pl` and `RNAfold` (see [refold](#refold) above).
+
 Planned future direction:
 
 - loosen the hard external dependency on `RNALalifold`
-- evaluate wrapping ViennaRNA Python bindings directly from Python
+- `alifoldz.pl` and `rnazRandomizeAln.pl` are the remaining Perl scripts;
+  replacing either means reimplementing a statistic, not just text handling
+- an integration tier that runs the container's real toolchain, since every
+  workflow test here stubs it
 
 ## Null-model calibration arm
 
