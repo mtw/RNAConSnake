@@ -83,6 +83,100 @@ jobs:
             exit 1
           fi
 
+  container-integration:
+    # The only tier that runs the *real* toolchain. Every other test in this
+    # repository stubs RNALalifold, RNAz and AlifoldZ, so a change in what those
+    # tools print is invisible to them -- and parsing that output is where this
+    # pipeline has historically broken.
+    #
+    # Skipped on pull_request: it builds an image and folds real RNA, so it
+    # costs minutes rather than seconds. Run it by hand from the Actions tab.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Neither is on a package index, which is the whole reason the container
+      # exists. alifoldz.pl comes from upstream RNAz here; a local build may
+      # vendor a patched copy, so this tier tests the pipeline against the
+      # published tool rather than against a private variant.
+      - name: Fetch the sources conda cannot supply
+        run: |
+          git clone --depth 1 https://github.com/mtw/SISSIz "$RUNNER_TEMP/SISSIz"
+          curl -fsSL -o "$RUNNER_TEMP/alifoldz.pl" \
+            https://raw.githubusercontent.com/ViennaRNA/RNAz/master/perl/alifoldz.pl
+
+      - name: Prepare the build context
+        run: |
+          SISSIZ_SRC="$RUNNER_TEMP/SISSIz" ALIFOLDZ="$RUNNER_TEMP/alifoldz.pl" \
+            ./container/prepare-context.sh
+
+      - name: Build the image
+        run: docker build -t rnacs:ci container
+
+      # Inside the image this must pass, including the check that the ViennaRNA
+      # binaries and the Python module are one build.
+      - name: Check the toolchain the image ships
+        run: docker run --rm rnacs:ci --check-deps
+
+      # No --user: the image runs as root, and an arbitrary uid has no passwd
+      # entry, which snakemake needs.
+      - name: Screen the JEV 3'UTR example through the real toolchain
+        run: |
+          mkdir -p "$RUNNER_TEMP/run"
+          docker run --rm \
+            -v "$PWD/examples:/data:ro" \
+            -v "$RUNNER_TEMP/run:/work" \
+            rnacs:ci \
+            --input-alignment /data/all_JEVG_3UTR.relabel.stk \
+            --output-dir /work \
+            --maxbpspan 100 --cores 2 --no-progress \
+            -- --config do_png=False
+
+      - name: The run produced real results, not empty ones
+        run: |
+          python3 - "$RUNNER_TEMP/run" <<'EOF'
+          import csv
+          import re
+          import sys
+          from pathlib import Path
+
+          run = Path(sys.argv[1])
+          summary = run / "generated_files" / "summary" / "len_100"
+          rows = list(csv.DictReader((summary / "RNAConSnake.log.csv").open()))
+          if not rows:
+              sys.exit("the screen reported no candidates at all")
+          print(f"{len(rows)} windows reported")
+
+          # Stubs cannot produce these: they are what the real tools computed.
+          scored = [r for r in rows if r["alifoldzscore"] not in ("", "NA")]
+          if not scored:
+              sys.exit("every AlifoldZ score is NA: the real tool never produced one")
+          probs = [r for r in rows if r["rnazprob"] not in ("", "NA")]
+          if not probs:
+              sys.exit("every RNAz probability is missing")
+          print(f"{len(scored)} AlifoldZ scores, {len(probs)} RNAz probabilities")
+
+          for required in ["RNAConSnake.nr.csv", "RNAConSnake.md", "RNAConSnake.log"]:
+              if not (summary / required).is_file():
+                  sys.exit(f"missing {required}")
+          if not (run / "generated_files" / "alignment_screenability.tsv").is_file():
+              sys.exit("missing the screenability report")
+
+          # The refold leg runs through the ViennaRNA Python bindings now, so
+          # this is where a bindings/binaries problem would surface.
+          refolded = sorted((run / "generated_files" / "refold" / "len_100").glob("*_refold.out"))
+          if not refolded:
+              sys.exit("the refold leg produced nothing")
+          record = re.compile(r"^> \S+\n[ACGUNacgun]+\n[().]+ \( *-?\d+\.\d\d\)$", re.M)
+          for path in refolded:
+              if not record.search(path.read_text()):
+                  sys.exit(f"{path.name} does not look like a constrained fold")
+          print(f"{len(refolded)} refolded candidates")
+          EOF
+
   package-smoke:
     runs-on: ubuntu-latest
     strategy:

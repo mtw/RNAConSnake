@@ -69,6 +69,11 @@ docker run --rm --platform linux/arm64 \
 Mount inputs read-only at `/data` and the run directory at `/work`. The
 entrypoint is `RNAcs`, so arguments are passed straight through.
 
+Run it as root, which is the image's default. Passing `--user` with a uid that
+has no entry in the image's `/etc/passwd` fails: snakemake looks the user up
+(`getpwuid(): uid not found`). Outputs in the mounted run directory are then
+owned by root on the host.
+
 ## Distributing to other machines
 
 `docker save` / `docker load` moves the built image without rebuilding:

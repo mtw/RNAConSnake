@@ -129,8 +129,12 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
   spawned tools). CI lints, runs the suite on 3.11-3.13, and verifies that the
   built sdist and wheel carry the workflow and every curated truth file. The
   workflow tests drive the real Snakemake DAG against stubbed external tools,
-  including both arms of the calibration and the positive control; no test yet
-  runs the real toolchain, which the container exists to provide.
+  including both arms of the calibration and the positive control. A separate
+  CI job builds the container and screens the JEV 3'UTR example through the
+  *real* toolchain -- the only tier where a change in what RNALalifold, RNAz or
+  AlifoldZ prints would surface -- and fails if the run comes back without
+  genuine scores. It is skipped on pull requests, where it would cost minutes
+  rather than seconds.
 - Internal cleanups: `SUMMARY_FIELDS` defined once and shared; `run_checked`
   uses `contextlib.ExitStack`; `normalize_rnaalifold_side_output` raises rather
   than silently no-oping; manifest rules share a helper; `refold_firstseq` and
