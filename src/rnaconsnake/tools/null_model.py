@@ -23,6 +23,7 @@ touches only this file:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import shlex
 import shutil
@@ -52,10 +53,6 @@ from rnaconsnake.workflow_helpers import (
 )
 
 MPI_DRIFT_WARNING = 0.05
-
-# Seeds Perl's RNG before handing control to the RNAz helper script, so that a
-# rerun with the same arm seed reproduces the same shuffled alignment.
-PERL_SEED_BOOTSTRAP = "srand(shift); my $script = shift; do $script; die $@ if $@;"
 
 
 class NullModelError(RuntimeError):
@@ -216,8 +213,13 @@ def simulate_pool(
     if source.n_seq < 2:
         raise NullModelError(f"Null simulation needs at least 2 sequences, source has {source.n_seq}")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        scratch = Path(workdir) if workdir else Path(tmp)
+    with contextlib.ExitStack() as stack:
+        # Only fall back to a temporary directory when no workdir was given;
+        # this used to create one unconditionally and then leave it unused.
+        if workdir:
+            scratch = Path(workdir)
+        else:
+            scratch = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         scratch.mkdir(parents=True, exist_ok=True)
         if method == "sissiz":
             blocks, backend_meta = _simulate_sissiz(source, replicates, sissiz_command, scratch)

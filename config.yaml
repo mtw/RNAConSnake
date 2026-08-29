@@ -91,6 +91,7 @@ emit_versions: false
 
 tools:
   rnalalifold: RNALalifold
+  split_stockholm: python3 -m rnaconsnake.tools.split_stockholm
   remove_gaponly: python3 -m rnaconsnake.tools.remove_gaponly
   strip_aln: python3 -m rnaconsnake.tools.strip_aln
   legacy_postprocess: python3 -m rnaconsnake.tools.legacy_postprocess

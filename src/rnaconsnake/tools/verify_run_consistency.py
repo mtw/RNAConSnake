@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from rnaconsnake.workflow_helpers import read_manifest
+from rnaconsnake.workflow_helpers import analysis_root, read_manifest
 
 
 def sha256_file(path: Path) -> str:
@@ -110,9 +110,14 @@ def compare_snapshots(left: CandidateSnapshot, right: CandidateSnapshot, wlen: i
 
 def comparison_payload(left_run: Path, right_run: Path, window_lengths: Iterable[int]) -> dict[str, object]:
     window_lengths = list(window_lengths)
+    left_root = analysis_root(left_run)
+    right_root = analysis_root(right_run)
     payload: dict[str, object] = {
         "left_run": str(left_run),
         "right_run": str(right_run),
+        # Which layout was actually compared: the run directory, or the real
+        # arm inside it. Recorded so a reader can tell the two apart.
+        "analysis_root": {"left": str(left_root), "right": str(right_root)},
         "window_lengths": window_lengths,
         "identical": True,
         "differences": [],
@@ -120,7 +125,7 @@ def comparison_payload(left_run: Path, right_run: Path, window_lengths: Iterable
     differences: list[str] = []
     for wlen in window_lengths:
         differences.extend(
-            compare_snapshots(build_snapshot(left_run, wlen), build_snapshot(right_run, wlen), wlen)
+            compare_snapshots(build_snapshot(left_root, wlen), build_snapshot(right_root, wlen), wlen)
         )
     payload["differences"] = differences
     payload["identical"] = not differences
@@ -156,8 +161,14 @@ def main() -> int:
     left_run = Path(args.left_run).resolve()
     right_run = Path(args.right_run).resolve()
 
-    left_windows = discover_window_lengths(left_run)
-    right_windows = discover_window_lengths(right_run)
+    # A calibrated run keeps every output under arms/real/. Discovering window
+    # lengths in the run directory itself would find none there, compare
+    # nothing, and report the two runs as identical.
+    left_root = analysis_root(left_run)
+    right_root = analysis_root(right_run)
+
+    left_windows = discover_window_lengths(left_root)
+    right_windows = discover_window_lengths(right_root)
 
     if args.maxbpspan:
         window_lengths = sorted(set(args.maxbpspan))
@@ -178,6 +189,26 @@ def main() -> int:
                     print(message)
             return 1
         window_lengths = left_windows
+
+    if not window_lengths:
+        # Having compared nothing is not the same as having found no
+        # difference, and must never be reported as agreement.
+        payload = {
+            "left_run": str(left_run),
+            "right_run": str(right_run),
+            "identical": False,
+            "differences": [
+                "no window lengths to compare: found no Lalifold/len_* or "
+                f"generated_files/stk/len_* under {left_root} or {right_root}. "
+                "Point this at completed run directories.",
+            ],
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            for message in payload["differences"]:
+                print(message)
+        return 1
 
     payload = comparison_payload(left_run, right_run, window_lengths)
     if args.json:

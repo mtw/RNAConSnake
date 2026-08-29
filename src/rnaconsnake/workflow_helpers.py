@@ -263,6 +263,27 @@ def arm_class(arm: str) -> str:
     return REAL_ARM if arm == REAL_ARM else "null"
 
 
+# The output roots the pipeline writes beneath. Finding any one of them under
+# ``arms/real/`` settles which layout a finished run used.
+ANALYSIS_ROOT_MARKERS = ("generated_files", "Lalifold")
+
+
+def analysis_root(run_dir: str | Path) -> Path:
+    """Where a completed run's per-candidate outputs live.
+
+    With the null-model arm enabled every pipeline output moves under
+    ``arms/<arm>/``, and the real arm is the one a report or an export
+    describes. Without it the run directory is the root, unchanged. Anything
+    reading a finished run has to resolve this first: looking straight at the
+    run directory finds nothing at all in a calibrated run.
+    """
+    run_dir = Path(run_dir)
+    real_arm = run_dir / "arms" / REAL_ARM
+    if any((real_arm / marker).is_dir() for marker in ANALYSIS_ROOT_MARKERS):
+        return real_arm
+    return run_dir
+
+
 @dataclass(frozen=True)
 class CandidatePaths:
     wlen: str | int
@@ -378,8 +399,11 @@ class CandidatePaths:
         return f"{self.arm_prefix}generated_files/refold/{self.len_dir}/{self.file}_refold.out"
 
     @property
-    def refold_json(self) -> str:
-        return f"{self.arm_prefix}generated_files/refold/{self.len_dir}/{self.file}.refold.json"
+    def consensus_json(self) -> str:
+        # The RNAalifold consensus structure, not the refold. It lived at
+        # `refold/{file}.refold.json` and was named for the leg that runs beside
+        # it rather than for what it holds; `_refold.out` is the refold.
+        return f"{self.arm_prefix}generated_files/consensus/{self.len_dir}/{self.file}.consensus.json"
 
     @property
     def maxcovar_log(self) -> str:

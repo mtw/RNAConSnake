@@ -19,26 +19,17 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Re-exported: an export bundle describes the real arm, and `analysis_root` is
+# what locates it. The arm layout itself is workflow plumbing, so it lives with
+# the rest of it rather than in the export layer.
+from rnaconsnake.workflow_helpers import analysis_root
+
 CALIBRATION_DIRNAME = "calibration"
 RESULTS_DIRNAME = "results"
-REAL_ARM_DIRNAME = "arms/real"
 
 CALIBRATION_FILES = ["funnel.tsv", "qvalues.tsv", "score_dists.tsv", "summary.json"]
 
 NA_VALUES = {"", "NA", "na", "None", "nan"}
-
-
-def analysis_root(run_dir: Path) -> Path:
-    """Where the per-candidate outputs live.
-
-    With the null-model arm enabled every pipeline output moves under
-    ``arms/<arm>/``; the real arm is the one an export describes. Without it the
-    run directory is the root, unchanged.
-    """
-    real_arm = run_dir / REAL_ARM_DIRNAME
-    if (real_arm / "generated_files" / "summary").is_dir():
-        return real_arm
-    return run_dir
 
 
 @dataclass(frozen=True)

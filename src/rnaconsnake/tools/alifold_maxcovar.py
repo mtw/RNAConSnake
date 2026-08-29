@@ -51,7 +51,11 @@ def compute(lines: Iterable[str]) -> tuple[int, str]:
 def main() -> int:
     maxcovar, what = compute(sys.stdin)
     sys.stdout.write(f"{maxcovar}\t{what}")
-    return maxcovar
+    # The count goes to stdout, never to the exit status. Returning it here made
+    # every candidate carrying covariation exit non-zero, which any caller that
+    # checks the status -- run_checked, a `set -e` shell, CI -- reads as the tool
+    # having failed. It also wrapped: a count of 256 would have exited 0.
+    return 0
 
 
 if __name__ == "__main__":

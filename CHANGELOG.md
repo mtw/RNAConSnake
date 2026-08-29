@@ -4,6 +4,71 @@ All notable changes to this project should be documented in this file.
 
 The format is based on Keep a Changelog, and this project aims to use Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+- **Export bundle schema 1.2.0.** The per-sequence constrained refold
+  (`*_refold.out`) is exported — it was computed for every candidate and never
+  carried into a bundle. `input_alignment_type` now reports the format the run
+  was actually given.
+- **`RNAcs --export-overwrite`**, and `threshold_sweep --representative`.
+- `split_stockholm` is configurable through `tools:` like every other tool; it
+  was the one hardcoded invocation in the workflow.
+
+### Changed
+- **`{candidate}.refold.json` is now `generated_files/consensus/{candidate}.consensus.json`**,
+  and the `extract-refold` subcommand is `extract-consensus`. The file holds the
+  RNAalifold consensus structure, not the refold; it was named for the leg that
+  runs beside it. The export artifact is `consensus_structure` /
+  "Consensus secondary structure" rather than "Refold summary".
+- `results/versions.yaml` is written with `yaml.safe_dump`.
+- PyYAML is a declared dependency; it was imported directly but only ever
+  arrived transitively through Snakemake.
+- The `reciprocal_overlap` column of the benchmark recovery table moved from
+  first to beside `overlap_fraction`, so the table leads with the element.
+- `remove_gaponly --infmt` defaults to `stockholm`, the only value it accepts.
+- The test suite is split by area under `tests/`, with shared fakes and builders
+  in `tests/helpers.py`.
+
+### Fixed
+- **`RNAcs --export-bundle` deleted the directory it was pointed at.** The
+  wrapper forced `overwrite=True` on every run, so an existing directory was
+  removed without asking. Overwriting is now opt-in (`--export-overwrite`) and
+  refuses any directory holding files that are not part of an export bundle.
+- **`threshold_sweep` ignored the representative rule**, always clustering with
+  `widest`, so a sweep of a run configured otherwise described different scores.
+- **`sensitivity_envelope` crashed after writing its outputs** when an alignment
+  yielded no subsets — `min()` over an empty sequence, raised at the last line.
+- **`--config null=<non-mapping>` raised an AttributeError traceback** instead of
+  saying what was wrong.
+- `run_with_progress` built progress bars in its `finally` block only to close
+  them, and could wait on a child whose pipe nobody was reading.
+- **`consensus_mfe` recorded RNAz's mean single-sequence MFE, not the consensus
+  MFE.** Both labels sat in one regex alternation, and `re.search` returns the
+  leftmost match — RNAz prints `Mean single sequence MFE` first, so on every
+  real output the wrong quantity was recorded (on an RNAz 2.1.1 example, -20.93
+  where the consensus MFE was -18.74). It reached `RNAConSnake.log.csv`,
+  `RNAConSnake.md`, every `*.summary.json`, and the `consensus_mfe` column of
+  the exported `candidates.csv`. **Re-export any bundle whose `consensus_mfe`
+  values matter; the other columns are unaffected.**
+- **`verify_run_consistency` reported two calibrated runs as identical without
+  comparing anything.** With the null-model arm enabled every output lives under
+  `arms/real/`, where the tool never looked; it found no window lengths, compared
+  nothing, and exited 0. It now resolves the analysis root the way the export
+  bundle does, and refuses to call an empty comparison agreement.
+- **`alifold_maxcovar` exited non-zero on success**, returning the covariation
+  count as the process exit status — so any caller checking the status read a
+  candidate carrying covariation as a failed tool. The count was always on
+  stdout; the status is now 0.
+- **`#=GR` annotation was not merged across interleaved Stockholm blocks.** The
+  sequences and `#=GC` lines beside it were, so a round trip emitted several
+  short `#=GR` rows against a full-length alignment.
+- **`split_stockholm --accession` decided nothing.** Both branches returned the
+  accession, so an accession always won and the default never reached `#=GF ID`.
+  The default now prefers `#=GF ID` and the flag selects the accession, as its
+  help always claimed. RNALalifold writes no `#=GF AC`, so pipeline candidate
+  names are unchanged.
+
 ## [0.3.0] - 2026-08-28
 
 ### Added

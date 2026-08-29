@@ -18,6 +18,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 # (config tool key, default command, argv used to ask for a version).
 # Several of these tools print their version to stderr and/or exit non-zero;
 # both are tolerated and the first non-empty output line is kept.
@@ -154,24 +156,16 @@ def collect(tools: dict[str, str] | None = None) -> dict[str, object]:
     }
 
 
-def _yaml_dump(payload: dict[str, object], indent: int = 0) -> str:
-    pad = "  " * indent
-    lines: list[str] = []
-    for key, value in payload.items():
-        if isinstance(value, dict):
-            lines.append(f"{pad}{key}:")
-            lines.append(_yaml_dump(value, indent + 1))
-        else:
-            text = str(value).replace('"', "'")
-            lines.append(f'{pad}{key}: "{text}"')
-    return "\n".join(line for line in lines if line)
-
-
 def write_versions(path: str | Path, tools: dict[str, str] | None = None) -> dict[str, object]:
     payload = collect(tools)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
+    # yaml.safe_dump rather than a hand-rolled writer: the values here are tool
+    # paths and version banners, and the hand-rolled one quoted every value with
+    # `"` while escaping nothing but `"` itself -- a backslash in a path emitted
+    # a file that would not parse back.
     Path(path).write_text(
-        "# RNAcs toolchain versions (generated; do not edit)\n" + _yaml_dump(payload) + "\n",
+        "# RNAcs toolchain versions (generated; do not edit)\n"
+        + yaml.safe_dump(payload, default_flow_style=False, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
     return payload

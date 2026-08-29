@@ -13,7 +13,9 @@ def parse_args() -> argparse.Namespace:
         description="Remove gap-only or high-gap sequences from Stockholm alignments."
     )
     parser.add_argument("-a", "--aln", required=True, help="Input alignment")
-    parser.add_argument("-i", "--infmt", default="clustalw", help="Input alignment format")
+    # Stockholm is the only format this accepts, so it is also the default.
+    # The default used to be clustalw, which the check below then rejected.
+    parser.add_argument("-i", "--infmt", default="stockholm", help="Input alignment format")
     parser.add_argument("-o", "--outfmt", help="Output alignment format")
     parser.add_argument("-r", "--gapratio", type=float, default=1.0, help="Maximum allowed gap fraction")
     parser.add_argument(

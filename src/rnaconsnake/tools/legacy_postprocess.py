@@ -17,6 +17,28 @@ def write_json(path: str | Path, payload: dict) -> None:
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+# The number trailing a label, as RNAz writes it: "Consensus MFE: -18.74".
+LABELLED_NUMBER = r"[^0-9-]*(-?\d+(?:\.\d+)?)"
+
+# Labels carrying the consensus MFE, most preferred first. The order is the
+# whole point: RNAz prints "Mean single sequence MFE" *before* "Consensus MFE",
+# and `re.search` returns the leftmost match, so a single alternation over both
+# records the mean single-sequence MFE as the consensus MFE on every real
+# output. They are different quantities -- on RNAz 2.1.1 output, -20.93 against
+# -18.74 -- so the consensus label is matched on its own, and the bare
+# "Mean MFE" is a fallback only for output carrying no consensus line at all.
+CONSENSUS_MFE_LABELS = ("consensus MFE", "mean MFE")
+
+
+def _labelled_number(text: str, labels: tuple[str, ...]) -> str:
+    """The number following the first of ``labels`` that ``text`` carries."""
+    for label in labels:
+        match = re.search(re.escape(label) + LABELLED_NUMBER, text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return ""
+
+
 def cmd_extract_rnaz(args: argparse.Namespace) -> int:
     text = Path(args.input).read_text(encoding="utf-8") if Path(args.input).exists() else ""
     match = re.search(r"probability[^0-9-]*(-?\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
@@ -26,17 +48,12 @@ def cmd_extract_rnaz(args: argparse.Namespace) -> int:
         text,
         flags=re.IGNORECASE,
     )
-    mfe_match = re.search(
-        r"(?:consensus MFE|mean single sequence MFE|mean MFE)[^0-9-]*(-?\d+(?:\.\d+)?)",
-        text,
-        flags=re.IGNORECASE,
-    )
     write_json(
         args.output,
         {
             "rnazprob": prob,
             "sci": sci_match.group(1) if sci_match else "",
-            "consensus_mfe": mfe_match.group(1) if mfe_match else "",
+            "consensus_mfe": _labelled_number(text, CONSENSUS_MFE_LABELS),
         },
     )
     return 0
@@ -111,7 +128,14 @@ def cmd_clean_clustal(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_extract_refold(args: argparse.Namespace) -> int:
+def cmd_extract_consensus(args: argparse.Namespace) -> int:
+    """The RNAalifold consensus structure, from its Stockholm output.
+
+    Named for the refold until now, and emitted into the refold directory,
+    because it is produced alongside that leg -- but the refold itself is
+    `_refold.out`, the per-sequence constrained folds, and nothing here reads
+    it. This extracts `#=GC SS_cons` and says so.
+    """
     ss_cons = ""
     for line in Path(args.rnaalifold_stk).read_text(encoding="utf-8").splitlines():
         if line.startswith("#=GC SS_cons "):
@@ -313,10 +337,10 @@ def build_parser() -> argparse.ArgumentParser:
     clean.add_argument("--output", required=True)
     clean.set_defaults(func=cmd_clean_clustal)
 
-    refold = sub.add_parser("extract-refold")
-    refold.add_argument("--rnaalifold-stk", required=True)
-    refold.add_argument("--output", required=True)
-    refold.set_defaults(func=cmd_extract_refold)
+    consensus = sub.add_parser("extract-consensus")
+    consensus.add_argument("--rnaalifold-stk", required=True)
+    consensus.add_argument("--output", required=True)
+    consensus.set_defaults(func=cmd_extract_consensus)
 
     maxcov = sub.add_parser("run-maxcovar")
     maxcov.add_argument("--ali-out", required=True)

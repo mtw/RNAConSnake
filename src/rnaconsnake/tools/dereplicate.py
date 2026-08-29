@@ -38,6 +38,7 @@ import argparse
 import csv
 import math
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 
 from rnaconsnake.tools.loci import WindowCoords, overlap, parse_window_name
@@ -122,8 +123,14 @@ class Cluster:
     def end(self) -> int:
         return max(member.end for member in self.members)
 
-    @property
+    @cached_property
     def representative(self) -> Candidate:
+        """The member window this locus is reported as.
+
+        Cached: this is a pure function of the members, and it was recomputed on
+        every access -- once per comparison in the sort key that orders the
+        non-redundant table, then again for the row itself.
+        """
         return select_representative(self.members, self.rule)
 
 

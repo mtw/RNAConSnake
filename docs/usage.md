@@ -431,7 +431,22 @@ RNAcs \
 
 ### What the export bundle carries
 
-`--export-bundle` writes schema **1.1.0**, which adds:
+`--export-bundle` writes schema **1.2.0**.
+
+1.2.0 adds:
+
+- the per-sequence constrained refold (`*.refold.out`) as a candidate artifact.
+  It is computed for every candidate and was previously not carried into a
+  bundle at all;
+- `input_alignment_type` reporting the format the run was given (`stockholm` or
+  `clustal`) rather than always claiming Stockholm.
+
+It also renames one artifact: `refold_summary` ("Refold summary") is
+`consensus_structure` ("Consensus secondary structure"). The file always held
+the RNAalifold consensus structure, not the refold — it was named for the leg
+running beside it.
+
+1.1.0 added:
 
 - per-candidate `locus_id`, `locus_start`, `locus_end`, `locus_window_count`,
   `is_representative` and `redundant_to`, so a consumer can show one row per
@@ -446,6 +461,11 @@ RNAcs \
 Every new column is optional, so a consumer written against 1.0.0 keeps working
 and simply does not see the new fields. When the null arm is enabled the export
 reads the real arm from `arms/real/`.
+
+The export directory is only ever written into, never cleared: pointing
+`--export-bundle` at a directory that already holds something fails unless you
+pass `--export-overwrite`, which itself refuses anything that is not a previous
+bundle.
 
 ## Configuration
 

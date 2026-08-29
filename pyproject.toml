@@ -16,6 +16,10 @@ authors = [
 dependencies = [
   "snakemake>=8,<10",
   "tqdm>=4,<5",
+  # Imported directly by the CLI (config parsing) and by the versions tool.
+  # Snakemake happens to pull it in, but relying on a transitive dependency for
+  # a direct import breaks the day that changes.
+  "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]

@@ -23,7 +23,6 @@ from pathlib import Path
 TRUTH_COLUMNS = ["element_id", "element_class", "alignment", "start", "end", "notes"]
 
 RECOVERY_COLUMNS = [
-    "reciprocal_overlap",
     "element_id",
     "element_class",
     "alignment",
@@ -36,6 +35,7 @@ RECOVERY_COLUMNS = [
     "locus_end",
     "overlap_columns",
     "overlap_fraction",
+    "reciprocal_overlap",
     "rnazprob",
     "alifoldzscore",
     "rscape_covary_count",

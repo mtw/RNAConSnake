@@ -58,10 +58,7 @@ def parse_stockholm_records(path: str | Path) -> list[StockholmRecord]:
                 current["gs_lines"].append((parts[1], line))
                 continue
             if line.startswith("#=GR "):
-                parts = line.split(None, 2)
-                if len(parts) != 3:
-                    raise ValueError(f"Malformed #=GR line: {line!r}")
-                current["gr_lines"].append((parts[1], line))
+                _append_gr(current, line)
                 continue
             if line.startswith("#"):
                 current["other_lines"].append(line)
@@ -131,6 +128,31 @@ def _append_gc(current: dict, line: str) -> None:
             current["gc_lines"][index] = f"#=GC {tag} {existing_parts[2]}{chunk}"
             return
     current["gc_lines"].append(line)
+
+
+def _append_gr(current: dict, line: str) -> None:
+    """Merge ``#=GR`` annotation across interleaved blocks, by sequence and tag.
+
+    ``#=GR`` is per-column data, exactly like ``#=GC``: an interleaved record
+    repeats it once per block and the chunks belong to a single row. Appending
+    each block's line separately emitted several short ``#=GR`` rows against a
+    full-length alignment -- a malformed record, while the sequences and the
+    ``#=GC`` lines beside them had been merged correctly.
+    """
+    parts = line.split(None, 3)
+    if len(parts) < 3:
+        raise ValueError(f"Malformed #=GR line: {line!r}")
+    name, tag = parts[1], parts[2]
+    chunk = parts[3] if len(parts) == 4 else ""
+    for index, (existing_name, existing_line) in enumerate(current["gr_lines"]):
+        existing = existing_line.split(None, 3)
+        if existing_name == name and len(existing) >= 3 and existing[2] == tag:
+            merged = existing[3] if len(existing) == 4 else ""
+            current["gr_lines"][index] = (name, f"#=GR {name} {tag} {merged}{chunk}")
+            return
+    # First block: keep the line verbatim, so a non-interleaved record round
+    # trips byte-for-byte rather than through this function's spacing.
+    current["gr_lines"].append((name, line))
 
 
 def _new_record() -> dict:

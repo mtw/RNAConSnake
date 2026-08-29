@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -316,13 +317,20 @@ checkpoint split_stockholm:
     log:
         out=A("Lalifold/len_{wlen}/split/split.out"),
         err=A("Lalifold/len_{wlen}/split/split.err")
+    params:
+        # Routed through `tools:` like every other tool. It used to be the one
+        # hardcoded invocation, so a site pointing this key elsewhere was ignored.
+        cmd=lambda wildcards: " ".join(
+            shlex.quote(token)
+            for token in command_tokens("split_stockholm", "python3 -m rnaconsnake.tools.split_stockholm")
+        )
     threads:
         1
     shell:
         """
         mkdir -p {output[0]}
         cd {output[0]}
-        python3 -m rnaconsnake.tools.split_stockholm -a ../RC_{wildcards.wlen}_0001.stk > split.out 2> split.err
+        {params.cmd} -a ../RC_{wildcards.wlen}_0001.stk > split.out 2> split.err
         find . -maxdepth 1 -type f -name 'RC_{wildcards.wlen}_*.stk' -print | sed 's#^\./##' | sort > manifest.txt
         """
 
@@ -641,17 +649,26 @@ rule run_refold_file:
         )
 
 
-rule extract_refold_metrics_file:
+rule extract_consensus_structure_file:
+    """The RNAalifold consensus structure, as a metric record.
+
+    Named for the refold until now, and written into the refold directory,
+    because the refold leg runs beside it -- but this reads only RNAalifold's
+    Stockholm output. The refold proper is `_refold.out`, which stays an
+    artifact of the run and is exported as one. It is kept as an input here so
+    the refold still has to succeed before a candidate is summarised.
+    """
     input:
         refold=A("generated_files/refold/len_{wlen}/{file}_refold.out"),
         stk=A("generated_files/rnaalifold/len_{wlen}/{file}/{file}.RNAalifold_results.stk")
     output:
-        A("generated_files/refold/len_{wlen}/{file}.refold.json")
+        A("generated_files/consensus/len_{wlen}/{file}.consensus.json")
     run:
+        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
         run_checked(
             command_tokens("legacy_postprocess", "python3 -m rnaconsnake.tools.legacy_postprocess")
             + [
-                "extract-refold",
+                "extract-consensus",
                 "--rnaalifold-stk",
                 input.stk,
                 "--output",
@@ -819,7 +836,7 @@ rule combine_summary_metrics_file:
     input:
         rnaz=A("generated_files/rnaz/len_{wlen}/{file}.rnaz.json"),
         alifoldz=A("generated_files/alifoldz/len_{wlen}/{file}.alifoldz.json"),
-        refold=A("generated_files/refold/len_{wlen}/{file}.refold.json"),
+        consensus=A("generated_files/consensus/len_{wlen}/{file}.consensus.json"),
         maxcov=A("generated_files/maxcovar/len_{wlen}/{file}.maxcovar.json"),
         rscape=A("generated_files/rscape/len_{wlen}/{file}.rscape.json")
     output:
@@ -837,7 +854,7 @@ rule combine_summary_metrics_file:
                 paths.summary_json,
                 input.rnaz,
                 input.alifoldz,
-                input.refold,
+                input.consensus,
                 input.maxcov,
                 input.rscape,
             ]

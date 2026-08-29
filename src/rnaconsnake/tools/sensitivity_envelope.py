@@ -20,6 +20,7 @@ import argparse
 import csv
 import itertools
 import random
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -166,11 +167,19 @@ def main() -> int:
         writer.writeheader()
         for row in rows:
             writer.writerow({k: row[k] for k in ["label", "n_seq", "identity", "names"]})
-    print(
-        f"{len(rows)} subsets spanning "
-        f"MPI {min(r['identity'] for r in rows):.2f}-{max(r['identity'] for r in rows):.2f} "
-        f"-> {outdir}"
-    )
+    if not rows:
+        # An alignment with fewer than two sequences has no subset to degrade.
+        # Say so: `min()` over no rows used to raise here, after the manifest
+        # and every subset file had already been written.
+        print(
+            f"no subsets to plan: {args.alignment} has {alignment.n_seq} sequences, "
+            f"and none of the requested sizes ({', '.join(str(size) for size in sizes) or 'none'}) "
+            "yields one",
+            file=sys.stderr,
+        )
+        return 1
+    identities = [row["identity"] for row in rows]
+    print(f"{len(rows)} subsets spanning MPI {min(identities):.2f}-{max(identities):.2f} -> {outdir}")
     return 0
 
 

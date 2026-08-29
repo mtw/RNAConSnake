@@ -18,6 +18,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def record_name(lines: list[str], prefer_accession: bool) -> str:
+    """The filename stem for one record: ``#=GF ID``, or ``#=GF AC`` on request.
+
+    ``--accession`` used to be inert -- both branches returned the accession, so
+    an accession always won and the flag decided nothing. RNALalifold writes
+    ``#=GF ID`` and no ``#=GF AC``, so the pipeline's own candidate names are
+    unaffected either way; the flag now does what it says for the hand-written
+    alignments the standalone tool is pointed at.
+    """
     record_id = None
     accession = None
     for line in lines:
@@ -27,10 +35,10 @@ def record_name(lines: list[str], prefer_accession: bool) -> str:
             record_id = line.split(None, 2)[2]
     if prefer_accession and accession:
         return accession
-    if accession:
-        return accession
     if record_id:
         return record_id
+    if accession:
+        return accession
     raise ValueError("Record is missing both #=GF ID and #=GF AC")
 
 

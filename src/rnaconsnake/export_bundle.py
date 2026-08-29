@@ -9,9 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rnaconsnake import __version__
-from rnaconsnake.export_annotations import analysis_root, manifest_block
 from rnaconsnake.export_annotations import collect as collect_annotations
-from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, read_json, write_json
+from rnaconsnake.export_annotations import manifest_block
+from rnaconsnake.workflow_helpers import SUMMARY_FIELDS, analysis_root, read_json, write_json
 
 FEATURE_COLUMNS = [
     "feature_id",
@@ -223,6 +223,18 @@ def bool_text(value: bool) -> str:
     return "true" if value else "false"
 
 
+# What the run was given, by extension -- the same two formats the workflow
+# accepts. Reported rather than assumed: this used to be the literal
+# "stockholm", so a bundle from a Clustal run misstated its own provenance.
+INPUT_ALIGNMENT_TYPES = {".stk": "stockholm", ".aln": "clustal"}
+
+
+def input_alignment_type(input_alignment: str | None) -> str:
+    if not input_alignment:
+        return "unknown"
+    return INPUT_ALIGNMENT_TYPES.get(Path(input_alignment).suffix.lower(), "unknown")
+
+
 def write_methods_markdown(path: Path, feature_label: str, maxbpspans: list[int]) -> None:
     path.write_text(
         "\n".join(
@@ -333,14 +345,64 @@ def add_artifact(
     )
 
 
+# The files a bundle owns. An --overwrite is allowed to delete a directory that
+# holds only these; anything else means the path is not a bundle, and deleting
+# it would destroy something the user did not ask us to touch.
+BUNDLE_ENTRIES = frozenset(
+    {
+        "manifest.json",
+        "features.csv",
+        "candidates.csv",
+        "artifacts.csv",
+        "methods.md",
+        "feature_summaries",
+        "candidate_summaries",
+        "files",
+        # Not ours, but the Finder leaves it in any directory that gets browsed,
+        # and it should not be what stops a re-export. Only this one name: any
+        # other dot entry -- `.git` above all -- must still count as foreign.
+        ".DS_Store",
+    }
+)
+
+
+def prepare_output_dir(output_dir: Path, overwrite: bool) -> None:
+    """Create the bundle directory, refusing to destroy anything that is not one.
+
+    ``--overwrite`` re-exports over a previous bundle. It used to be an
+    unconditional ``rmtree`` of whatever the path pointed at, which the RNAcs
+    wrapper passed on every run -- so pointing ``--export-bundle`` at an
+    existing directory deleted it.
+    """
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return
+    if not output_dir.is_dir():
+        raise FileExistsError(f"Export destination exists and is not a directory: {output_dir}")
+
+    entries = {child.name for child in output_dir.iterdir()}
+    if not entries:
+        return
+    if not overwrite:
+        raise FileExistsError(
+            f"Output directory already exists and is not empty: {output_dir}. "
+            "Pass --overwrite (RNAcs: --export-overwrite) to replace a previous bundle."
+        )
+    foreign = sorted(entries - BUNDLE_ENTRIES)
+    if foreign:
+        raise FileExistsError(
+            f"Refusing to overwrite {output_dir}: it holds files that are not part of an "
+            "export bundle (" + ", ".join(foreign[:10]) + (" ..." if len(foreign) > 10 else "") + "). "
+            "Export to a new directory, or delete this one yourself."
+        )
+    shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
 def build_export(args: argparse.Namespace) -> Path:
     run_dir = Path(args.run_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
-    if output_dir.exists():
-        if not args.overwrite:
-            raise FileExistsError(f"Output directory already exists: {output_dir}")
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    prepare_output_dir(output_dir, overwrite=bool(getattr(args, "overwrite", False)))
 
     annotations = collect_annotations(run_dir)
     # With the null-model arm enabled the pipeline outputs live under
@@ -434,18 +496,36 @@ def build_export(args: argparse.Namespace) -> Path:
                 "metrics",
                 40,
             ),
-            "refold_summary": (
+            # The RNAalifold consensus structure. Exported as "Refold summary"
+            # until now, which named the leg running beside it rather than its
+            # contents; the refold proper is the artifact below.
+            "consensus_structure": (
                 summary_root
                 / "generated_files"
-                / "refold"
+                / "consensus"
                 / f"len_{record.wlen}"
-                / f"{candidate_id}.refold.json",
-                f"{candidate_bundle_dir}/{candidate_id}.refold.json",
-                "Refold summary",
+                / f"{candidate_id}.consensus.json",
+                f"{candidate_bundle_dir}/{candidate_id}.consensus.json",
+                "Consensus secondary structure",
                 "json",
                 False,
                 "metrics",
                 50,
+            ),
+            # The per-sequence constrained folds. Computed on every candidate
+            # and never exported, so a consumer could not see the refold at all.
+            "refold": (
+                summary_root
+                / "generated_files"
+                / "refold"
+                / f"len_{record.wlen}"
+                / f"{candidate_id}_refold.out",
+                f"{candidate_bundle_dir}/{candidate_id}.refold.out",
+                "Per-sequence constrained refold",
+                "txt",
+                False,
+                "metrics",
+                51,
             ),
             "alignment_plot_pdf": (
                 summary_root
@@ -655,7 +735,10 @@ def build_export(args: argparse.Namespace) -> Path:
 
     manifest = {
         "project": "RNAConSnake",
-        "export_schema_version": "1.1.0",
+        # 1.2.0: the per-sequence refold is exported, the consensus structure
+        # artifact is named for what it holds, and input_alignment_type reports
+        # the format the run was actually given.
+        "export_schema_version": "1.2.0",
         "pipeline_version": __version__,
         "dataset_id": dataset_id,
         "dataset_label": dataset_label,
@@ -665,7 +748,7 @@ def build_export(args: argparse.Namespace) -> Path:
         "artifacts_file": "artifacts.csv",
         "description": args.description or f"RNAConSnake export for {feature_label}",
         "methods_file": methods_rel,
-        "input_alignment_type": "stockholm",
+        "input_alignment_type": input_alignment_type(args.input_alignment),
         "feature_count": 1,
         "candidate_count": len(candidate_rows),
         "source_label": source_label,

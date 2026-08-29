@@ -27,6 +27,7 @@ from rnaconsnake.tools.calibration import (
     read_summary_rows,
     rscape_was_evaluated,
 )
+from rnaconsnake.tools.dereplicate import REPRESENTATIVE_RULES
 from rnaconsnake.workflow_helpers import REAL_ARM
 
 SWEEP_COLUMNS = [
@@ -104,6 +105,7 @@ def sweep(
                     base.locus_min_overlap,
                     base.max_container_width,
                     base.container_min_coverage,
+                    base.representative_rule,
                 )
             )
         loci_by_arm[arm] = loci
@@ -125,6 +127,7 @@ def sweep(
                 pair_containment=base.pair_containment,
                 max_container_width=base.max_container_width,
                 container_min_coverage=base.container_min_coverage,
+                representative_rule=base.representative_rule,
             )
             real = cascade_survivors(loci_by_arm[REAL_ARM], thresholds, include_rscape)
             null_counts = [
@@ -193,6 +196,15 @@ def main() -> int:
     parser.add_argument("--min-overlap-fraction", type=float, default=0.5)
     parser.add_argument("--dereplicate-method", default="containment")
     parser.add_argument("--max-container-width", type=int, default=120)
+    parser.add_argument(
+        "--representative",
+        default="widest",
+        choices=list(REPRESENTATIVE_RULES),
+        help=(
+            "How each locus picks the window that represents it. Must match the run being "
+            "swept: a different rule clusters to the same loci but scores them differently."
+        ),
+    )
     args = parser.parse_args()
 
     arm_inputs: dict[str, dict[int, str]] = {}
@@ -211,6 +223,7 @@ def main() -> int:
         pair_containment=0.9,
         max_container_width=args.max_container_width,
         container_min_coverage=0.8,
+        representative_rule=args.representative,
     )
     spans = read_reference_spans(args.reference) if args.reference else None
     points = sweep(

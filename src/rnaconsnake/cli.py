@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover - fallback only
 # ``tools.alifoldz: /custom/path/alifoldz.pl`` is what actually gets checked.
 DEFAULT_TOOL_COMMANDS = {
     "rnalalifold": "RNALalifold",
+    "split_stockholm": "python3 -m rnaconsnake.tools.split_stockholm",
     "remove_gaponly": "python3 -m rnaconsnake.tools.remove_gaponly",
     "strip_aln": "python3 -m rnaconsnake.tools.strip_aln",
     "legacy_postprocess": "python3 -m rnaconsnake.tools.legacy_postprocess",
@@ -141,6 +142,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--export-description",
         help="Optional dataset/feature description for the export bundle.",
+    )
+    parser.add_argument(
+        "--export-overwrite",
+        action="store_true",
+        help=(
+            "Replace a previous export bundle at --export-bundle. Without it, an existing "
+            "non-empty directory is left alone and the run fails rather than deleting it."
+        ),
     )
     parser.add_argument(
         "--null-arm",
@@ -627,12 +636,17 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
         bufsize=1,
     )
 
+    # Checked before the try, not inside it: raising in there sent us to a
+    # `finally` that waits on a child whose pipe nobody is reading.
+    if process.stdout is None:  # pragma: no cover - Popen always gives a pipe here
+        process.kill()
+        process.wait()
+        raise RuntimeError("subprocess stdout pipe was not established")
+
     overall = None
     bars: dict[str, tqdm] = {}
     current_stats: list[str] | None = None
     try:
-        if process.stdout is None:
-            raise RuntimeError("subprocess stdout pipe was not established")
         for raw_line in process.stdout:
             line = raw_line.rstrip("\n")
 
@@ -675,20 +689,68 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
             else:
                 print(line)
     finally:
+        # Close whatever was opened, and drain the pipe first: leaving it unread
+        # while waiting can deadlock a child that is still writing.
+        if process.stdout is not None:
+            process.stdout.close()
         returncode = process.wait()
-        if current_stats is not None:
-            total, counts = parse_job_stats_lines(current_stats)
-            if total and overall is None:
-                overall = tqdm(total=total, desc="Overall", position=0, leave=True, dynamic_ncols=True)
-                for position, (rule, count) in enumerate(sorted(counts.items()), start=1):
-                    bars[rule] = tqdm(
-                        total=count, desc=rule, position=position, leave=True, dynamic_ncols=True
-                    )
+        # No bars are built here. Creating them at this point only to close them
+        # on the next line drew a burst of finished-looking output after the run
+        # had already ended.
         if overall is not None:
             overall.close()
         for bar in bars.values():
             bar.close()
     return returncode
+
+
+def requested_null_method(effective_null: object) -> str | None:
+    """The null backend this run needs a dependency for, or ``None``.
+
+    ``none`` collapses to ``None``: it is the disabled arm, not a backend.
+    ``--config null=<literal>`` arrives as whatever the user wrote, so this is
+    not necessarily a mapping -- say so rather than raising an AttributeError
+    out of the ``.get()``.
+    """
+    if not effective_null:
+        return None
+    if not isinstance(effective_null, dict):
+        print(
+            f"The null-arm configuration must be a mapping, got "
+            f"{type(effective_null).__name__}: {effective_null!r}.\n"
+            "Pass it as --config \"null={'method': 'sissiz', 'replicates': 100}\", "
+            "or use --null-arm.",
+            file=sys.stderr,
+        )
+        # 2, like the other preflight refusals.
+        raise SystemExit(2)
+    method = effective_null.get("method")
+    return None if method == "none" else method
+
+
+def export_bundle_after_run(args: argparse.Namespace) -> Path:
+    """Build the post-run export bundle described by the ``--export-*`` options."""
+    run_dir = Path(args.output_dir).resolve() if args.output_dir else Path.cwd().resolve()
+    output_dir = Path(args.export_bundle).resolve()
+    build_export(
+        argparse.Namespace(
+            run_dir=str(run_dir),
+            output_dir=str(output_dir),
+            dataset_id=args.export_dataset_id,
+            dataset_label=args.export_dataset_label,
+            feature_id=args.export_feature_id,
+            feature_label=args.export_feature_label,
+            feature_type=args.export_feature_type,
+            input_alignment=str(Path(args.input_alignment).resolve()),
+            source_label=args.export_source_label,
+            description=args.export_description,
+            # Never unconditionally: this used to be True on every run, so
+            # pointing --export-bundle at an existing directory deleted it.
+            overwrite=args.export_overwrite,
+        )
+    )
+    print(f"RNAConSnake export bundle written to: {output_dir}")
+    return output_dir
 
 
 def main() -> int:
@@ -706,9 +768,7 @@ def main() -> int:
     # A run is calibrated when the CLI asks for it, when a --config override
     # asks for it, or when the config file already has the arm switched on.
     effective_null = null_config or overrides.get("null") or load_config_section(configfile, "null")
-    null_method = effective_null.get("method") if effective_null else None
-    if null_method == "none":
-        null_method = None
+    null_method = requested_null_method(effective_null)
     include_rscape = args.rscape or _truthy(
         overrides.get("do_rscape"), load_config_payload(configfile).get("do_rscape")
     )
@@ -802,22 +862,7 @@ def main() -> int:
         return returncode
 
     if args.export_bundle:
-        run_dir = Path(args.output_dir).resolve() if args.output_dir else Path.cwd().resolve()
-        export_args = argparse.Namespace(
-            run_dir=str(run_dir),
-            output_dir=str(Path(args.export_bundle).resolve()),
-            dataset_id=args.export_dataset_id,
-            dataset_label=args.export_dataset_label,
-            feature_id=args.export_feature_id,
-            feature_label=args.export_feature_label,
-            feature_type=args.export_feature_type,
-            input_alignment=str(Path(args.input_alignment).resolve()),
-            source_label=args.export_source_label,
-            description=args.export_description,
-            overwrite=True,
-        )
-        build_export(export_args)
-        print(f"RNAConSnake export bundle written to: {Path(args.export_bundle).resolve()}")
+        export_bundle_after_run(args)
 
     return 0
 

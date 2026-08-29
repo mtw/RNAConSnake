@@ -102,7 +102,12 @@ RNAcs \
 
 ## Tests And Fixtures
 
-The test suite lives in [`tests/test_python_tools.py`](../tests/test_python_tools.py).
+The test suite lives in [`tests/`](../tests), split by area: `test_cli.py`,
+`test_workflow.py`, `test_calibration.py`, `test_dereplication.py`,
+`test_benchmark.py`, `test_export_bundle.py`, `test_postprocess.py`,
+`test_stockholm_tools.py`, `test_refold.py`, `test_analysis_tools.py` and
+`test_project_hygiene.py`. Shared fake tools and builders live in
+[`tests/helpers.py`](../tests/helpers.py), which holds no assertions.
 
 Fixtures are split into two groups:
 
@@ -123,6 +128,11 @@ This checks:
 - `Lalifold/len_*/RC_*_0001.stk`
 - split manifests and per-candidate split Stockholm files
 - cleaned alignment manifests and per-candidate files under `generated_files/stk`
+
+When a run was calibrated these live under `arms/real/`, which the comparison
+resolves on its own; the `analysis_root` field of `--json` records which layout
+it read. Finding nothing to compare is reported as a failure, never as
+agreement.
 
 It deliberately does not compare stochastic downstream metrics such as `alifoldz` z-scores.
 
@@ -223,7 +233,7 @@ discouraged:
 
 If you add a rule downstream of `make_arm_alignment`, wrap its paths in `A()`
 and take its `CandidatePaths` from `paths_for(wildcards)`. Do not add an
-arm-specific variant of an existing rule; `tests/test_python_tools.py` asserts
+arm-specific variant of an existing rule; `tests/test_workflow.py` asserts
 that no rule name or rule body is duplicated.
 
 Behaviour when the arm is disabled (`null.method: none`, the default) must stay
