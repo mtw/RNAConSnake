@@ -82,14 +82,21 @@ def test_no_web_assets_are_tracked() -> None:
 def test_no_rendering_code_or_dependency_is_tracked() -> None:
     import re as _re
 
+    import tests.helpers
+
     pattern = _re.compile("|".join(WEB_FORBIDDEN_PATTERNS), _re.IGNORECASE)
+    # The guard names the forbidden things, so it cannot police the file that
+    # spells them out. That is the module defining the patterns, not
+    # necessarily the one running the test -- derived from the module so the
+    # exclusion follows the literals if they move again, and stays exactly two
+    # files wide. Everything else in the repository is still checked.
+    exempt = {Path(__file__).resolve(), Path(tests.helpers.__file__).resolve()}
     offenders: list[str] = []
     for path in _tracked_files():
         full = ROOT / path
         if not full.is_file():
             continue
-        # This test names the forbidden things, so it cannot police itself.
-        if full.resolve() == Path(__file__).resolve():
+        if full.resolve() in exempt:
             continue
         try:
             text = full.read_text(encoding="utf-8")

@@ -177,6 +177,71 @@ jobs:
           print(f"{len(refolded)} refolded candidates")
           EOF
 
+      # Every other tier stubs RNAz, so the fake prints whatever the test
+      # expects and a wrong field mapping is invisible by construction. That is
+      # how `consensus_mfe` came to hold RNAz's *mean single sequence* MFE: both
+      # labels sat in one regex alternation, and RNAz prints that one first.
+      # Here the real tool's own output is still on disk next to what we parsed
+      # out of it, so the two can simply be compared.
+      - name: The parsed metrics are the numbers RNAz actually printed
+        run: |
+          python3 - "$RUNNER_TEMP/run" <<'EOF'
+          import csv
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          run = Path(sys.argv[1])
+          rows = {
+              r["wbn"]: r
+              for r in csv.DictReader(
+                  (run / "generated_files" / "summary" / "len_100" / "RNAConSnake.log.csv").open()
+              )
+          }
+
+          def printed(text, label):
+              """The number RNAz wrote after `label`, read off its own output."""
+              match = re.search(rf"^\s*{re.escape(label)}:\s*(-?\d+(?:\.\d+)?)\s*$", text, re.M)
+              return match.group(1) if match else None
+
+          checked = 0
+          for report in sorted((run / "generated_files" / "rnaz" / "len_100").glob("*.rnaz.txt")):
+              candidate = report.name[: -len(".rnaz.txt")]
+              row = rows.get(candidate)
+              if row is None:
+                  sys.exit(f"{candidate} has RNAz output but no summary row")
+              text = report.read_text()
+              expected = {
+                  "consensus_mfe": printed(text, "Consensus MFE"),
+                  "sci": printed(text, "Structure conservation index"),
+                  "rnazprob": printed(text, "SVM RNA-class probability"),
+              }
+              if expected["consensus_mfe"] is None:
+                  continue  # RNAz scored nothing for this window
+              # The trap this exists for: these two are different quantities.
+              decoy = printed(text, "Mean single sequence MFE")
+              for field, want in expected.items():
+                  if want is None:
+                      continue
+                  got = row[field]
+                  if float(got) != float(want):
+                      sys.exit(
+                          f"{candidate}: {field} is {got}, RNAz printed {want}"
+                          + (
+                              f" (it matches 'Mean single sequence MFE' = {decoy}: "
+                              "the wrong field is being read)"
+                              if decoy is not None and float(got) == float(decoy)
+                              else ""
+                          )
+                      )
+              checked += 1
+
+          if not checked:
+              sys.exit("no RNAz report carried a Consensus MFE: nothing was actually verified")
+          print(f"{checked} candidates: consensus_mfe, sci and rnazprob match RNAz's own output")
+          EOF
+
   package-smoke:
     runs-on: ubuntu-latest
     strategy:
