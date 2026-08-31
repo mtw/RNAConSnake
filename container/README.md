@@ -18,9 +18,8 @@ image removes:
 Refolding needs no vendored tool: it runs through the ViennaRNA Python module,
 which must be importable in the image's environment.
 
-R-scape is also absent from bioconda and is **not** included: the default
-configuration has `do_rscape: false`. Enabling R-scape means extending the
-image.
+R-scape **is** included (`rscape=2.0.4.a`), so `do_rscape: true` works in the
+image without extending it, though the default configuration leaves it off.
 
 ## Build
 

@@ -7,6 +7,8 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 ## [Unreleased]
 
 ### Added
+- **R-scape ships in the container** (`rscape=2.0.4.a`), so `do_rscape: true`
+  works without extending the image.
 - **SISSIz is pinned to release 0.2.0.** It is on no package index, so nothing
   resolves it: whatever is on `PATH` simulates the null alignments. Since it
   cannot be seeded, the build is part of what a calibration is reproducible
