@@ -9,6 +9,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 V="$HERE/vendor"
 
+# The pinned SISSIz release. Keep in step with SISSIZ_VERSION in
+# src/rnaconsnake/cli.py and the clone tag in .github/workflows/ci.yml.
+SISSIZ_VERSION="${SISSIZ_VERSION:-0.2.0}"
 SISSIZ_SRC="${SISSIZ_SRC:-$HOME/C/SISSIz}"
 ALIFOLDZ="${ALIFOLDZ:-$HOME/.local/share/RNAz/perl/alifoldz.pl}"
 
@@ -42,9 +45,24 @@ else
 fi
 [ -d "$SISSIZ_SRC" ] || {
   echo "missing SISSIz source: $SISSIZ_SRC" >&2
-  echo "clone it with: git clone https://github.com/mtw/SISSIz \"$SISSIZ_SRC\"" >&2
+  echo "clone it with: git clone --branch $SISSIZ_VERSION https://github.com/mtw/SISSIz \"$SISSIZ_SRC\"" >&2
   exit 1
 }
+# The image must ship the pinned release. SISSIz cannot be seeded, so the build
+# that simulates the null alignments is part of what a calibration is
+# reproducible against -- a source tree left on some other commit would produce
+# a different null model, silently. Warn rather than fail: a maintainer
+# bisecting SISSIz needs to be able to build an image from a working tree.
+if SISSIZ_DESCRIBED=$(git -C "$SISSIZ_SRC" describe --tags --always --dirty 2>/dev/null); then
+  if [ "$SISSIZ_DESCRIBED" != "$SISSIZ_VERSION" ]; then
+    echo "WARNING: SISSIz source is at '$SISSIZ_DESCRIBED', expected '$SISSIZ_VERSION'" >&2
+    echo "  pin it with: git -C \"$SISSIZ_SRC\" checkout $SISSIZ_VERSION" >&2
+  else
+    echo "SISSIz: $SISSIZ_DESCRIBED"
+  fi
+else
+  echo "WARNING: $SISSIZ_SRC is not a git checkout; cannot confirm it is $SISSIZ_VERSION" >&2
+fi
 cp -R "$SISSIZ_SRC" "$V/SISSIz"
 # Drop host build artefacts so the container configures cleanly.
 find "$V/SISSIz" \( -name '*.o' -o -name 'config.status' -o -name 'config.log' \

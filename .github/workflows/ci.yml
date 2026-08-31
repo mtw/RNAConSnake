@@ -102,9 +102,14 @@ jobs:
       # exists. alifoldz.pl comes from upstream RNAz and prepare-context.sh
       # applies the repository's own patch to it, so this tier runs the same
       # script the shipped image does.
+      # SISSIz is pinned to a release tag rather than tracking the default
+      # branch: it cannot be seeded, so the build that simulates the null
+      # alignments is part of what a calibration is reproducible against.
+      # Keep in step with SISSIZ_VERSION in src/rnaconsnake/cli.py.
       - name: Fetch the sources conda cannot supply
         run: |
-          git clone --depth 1 https://github.com/mtw/SISSIz "$RUNNER_TEMP/SISSIz"
+          git clone --depth 1 --branch 0.2.0 \
+            https://github.com/mtw/SISSIz "$RUNNER_TEMP/SISSIz"
           curl -fsSL -o "$RUNNER_TEMP/alifoldz.pl" \
             https://raw.githubusercontent.com/ViennaRNA/RNAz/master/perl/alifoldz.pl
 

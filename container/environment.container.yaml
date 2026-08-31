@@ -2,7 +2,7 @@
 #
 # NOT here, because they are absent from bioconda entirely and are installed
 # separately in the Dockerfile:
-#   SISSIz        - built from source (null-model generator; the arm needs it)
+#   SISSIz 0.2.0  - built from source (null-model generator; the arm needs it)
 #   alifoldz.pl   - RNAz ships it in the source tarball, not in the conda package
 #   ps2eps        - Debian package
 #   epstopdf      - Debian texlive

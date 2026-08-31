@@ -245,6 +245,15 @@ VIENNARNA_BINARIES = ("rnalalifold", "rnaalifold")
 # would be one nothing can install anyway.
 MINIMUM_VIENNARNA = (2, 7)
 
+# The SISSIz release the null arm is developed against, and the tag CI and the
+# container both build. SISSIz is on no package index, so there is no resolver
+# to enforce this: whatever happens to be on PATH is what simulates the null
+# alignments. Since it cannot be seeded, the version is part of what a
+# calibration is reproducible against -- an older build is a different null
+# model, not merely an older one.
+SISSIZ_VERSION = "0.2.0"
+MINIMUM_SISSIZ = (0, 2, 0)
+
 VERSION_NUMBER = re.compile(r"\d+\.\d+(?:\.\d+)*")
 
 
@@ -316,7 +325,13 @@ def check_dependencies(
     if outdated:
         conflicts.insert(0, outdated)
 
-    if missing or conflicts:
+    # Only for a run that actually simulates with it, and only once the command
+    # is known to resolve -- probing a missing one would report nothing useful.
+    stale_sissiz = ""
+    if null_method == "sissiz" and not missing:
+        stale_sissiz = sissiz_too_old(configured_tools)
+
+    if missing or conflicts or stale_sissiz:
         if missing:
             print("Missing runtime dependencies:", file=sys.stderr)
             for dep in missing:
@@ -332,9 +347,16 @@ def check_dependencies(
                 "two builds'\n  energy parameters.",
                 file=sys.stderr,
             )
+        if stale_sissiz:
+            print("SISSIz version problem:", file=sys.stderr)
+            print(f"  - {stale_sissiz}", file=sys.stderr)
         return 2
 
-    print(f"All external runtime dependencies are available (ViennaRNA {parse_version(bindings)}).")
+    reported = f"ViennaRNA {parse_version(bindings)}"
+    if null_method == "sissiz":
+        sissiz = parse_version(probe_version(tool_command("sissiz", configured_tools)))
+        reported += f", SISSIz {sissiz or 'version unknown'}"
+    print(f"All external runtime dependencies are available ({reported}).")
     return 0
 
 
@@ -378,6 +400,28 @@ def viennarna_too_old(bindings: str | None) -> str:
         return ""
     minimum = ".".join(str(part) for part in MINIMUM_VIENNARNA)
     return f"ViennaRNA {parse_version(bindings)} is older than the {minimum} this needs"
+
+
+def sissiz_too_old(configured_tools: dict[str, str] | None = None) -> str:
+    """Complaint about a SISSIz older than the null arm expects, or ``""``.
+
+    Only meaningful for a run that actually simulates: the check is made from
+    the null backend the run selected, never unconditionally.
+    """
+    command = tool_command("sissiz", configured_tools)
+    found = version_tuple(parse_version(probe_version(command)))
+    # An unreadable version is not an old one. SISSIz gained --version in 0.2.0,
+    # so silence here means an older build -- but site wrappers exist too, and
+    # refusing to run on a version nobody could read would be a guess.
+    if not found or found >= MINIMUM_SISSIZ:
+        return ""
+    minimum = ".".join(str(part) for part in MINIMUM_SISSIZ)
+    return (
+        f"{command} is {'.'.join(str(part) for part in found)}, older than the {minimum} "
+        "the null-model arm expects. SISSIz cannot be seeded, so the version is part of "
+        "what a calibration is reproducible against; build the pinned tag "
+        f"({SISSIZ_VERSION}) from https://github.com/mtw/SISSIz"
+    )
 
 
 def probe_version(command: str) -> str:

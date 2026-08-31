@@ -14,8 +14,13 @@ pip install -e .[dev]
 This project packages the Python-side workflow logic, but still expects the external RNA analysis toolchain to be installed separately and available on `PATH`.
 
 Two of those tools are on no package index and must be built or copied by
-hand: **SISSIz** (<https://github.com/mtw/SISSIz>) and **`alifoldz.pl`** (RNAz
-source tarball). Refolding additionally needs the ViennaRNA **Python module**
+hand: **SISSIz** (<https://github.com/mtw/SISSIz>, pinned to release **0.2.0**)
+and **`alifoldz.pl`** (RNAz source tarball). The SISSIz pin is recorded in three
+places that must stay in step: `SISSIZ_VERSION` in
+[`src/rnaconsnake/cli.py`](../src/rnaconsnake/cli.py), the clone tag in
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml), and `SISSIZ_VERSION`
+in [`container/prepare-context.sh`](../container/prepare-context.sh), which
+warns when the source tree it is given sits on anything else. Refolding additionally needs the ViennaRNA **Python module**
 (`import RNA`) in the same environment. The
 [container](../container/README.md) packages all of them and is the least
 painful way to get a complete environment:

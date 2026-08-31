@@ -11,7 +11,7 @@ image removes:
 
 | piece | why it needs special handling |
 | --- | --- |
-| **SISSIz** | not in bioconda on any platform; compiled from source ([https://github.com/mtw/SISSIz](https://github.com/mtw/SISSIz)) |
+| **SISSIz** | not in bioconda on any platform; compiled from source, pinned to release **0.2.0** ([https://github.com/mtw/SISSIz](https://github.com/mtw/SISSIz)) |
 | **alifoldz.pl** | ships in the RNAz *source* tarball, not the conda package |
 | **ps2eps**, **epstopdf** | Debian packages; not in conda-forge |
 
@@ -35,7 +35,7 @@ and must already be present on the build machine:
 
 | piece | where to get it |
 | --- | --- |
-| SISSIz source | clone [https://github.com/mtw/SISSIz](https://github.com/mtw/SISSIz); the build tree, not a binary |
+| SISSIz source | clone [https://github.com/mtw/SISSIz](https://github.com/mtw/SISSIz) at tag `0.2.0`; the build tree, not a binary |
 | `alifoldz.pl` | the **RNAz source tarball** (`perl/` directory) — absent from the conda package |
 
 `prepare-context.sh` applies
@@ -52,7 +52,7 @@ produces the same image.
 Override the locations if yours differ:
 
 ```bash
-git clone https://github.com/mtw/SISSIz ~/src/SISSIz
+git clone --branch 0.2.0 https://github.com/mtw/SISSIz ~/src/SISSIz
 
 SISSIZ_SRC=~/src/SISSIz \
 ALIFOLDZ=~/.local/share/RNAz/perl/alifoldz.pl \

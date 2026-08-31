@@ -7,6 +7,15 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 ## [Unreleased]
 
 ### Added
+- **SISSIz is pinned to release 0.2.0.** It is on no package index, so nothing
+  resolves it: whatever is on `PATH` simulates the null alignments. Since it
+  cannot be seeded, the build is part of what a calibration is reproducible
+  against — an older one is a different null model, not merely an older tool.
+  CI and the container now build the `0.2.0` tag, `prepare-context.sh` warns
+  when the source tree it is handed sits on anything else, and
+  `RNAcs --check-deps` refuses an older build for a run using
+  `--null-arm sissiz`. The resolved version is reported by `--check-deps` and
+  recorded in `results/versions.yaml`.
 - **Export bundle schema 1.2.0.** The per-sequence constrained refold
   (`*_refold.out`) is exported — it was computed for every candidate and never
   carried into a bundle. `input_alignment_type` now reports the format the run

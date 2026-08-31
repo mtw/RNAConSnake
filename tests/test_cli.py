@@ -319,6 +319,48 @@ def test_viennarna_below_the_supported_minimum_is_refused() -> None:
     assert cli.viennarna_too_old("unknown") == ""
 
 
+def test_sissiz_below_the_pinned_release_is_refused(monkeypatch) -> None:
+    """SISSIz cannot be seeded, so the build that simulates the null alignments
+    is part of what a calibration is reproducible against: an older one is a
+    different null model, not merely an older tool."""
+    assert cli.MINIMUM_SISSIZ == (0, 2, 0)
+    assert cli.SISSIZ_VERSION == "0.2.0"
+
+    monkeypatch.setattr(cli, "probe_version", lambda command: "SISSIz v 0.1.0")
+    complaint = cli.sissiz_too_old()
+    assert "0.1.0" in complaint
+    assert "0.2.0" in complaint
+
+    monkeypatch.setattr(cli, "probe_version", lambda command: "SISSIz v 0.2.0")
+    assert cli.sissiz_too_old() == ""
+    monkeypatch.setattr(cli, "probe_version", lambda command: "SISSIz v 0.3.1")
+    assert cli.sissiz_too_old() == ""
+    # A version nobody could read is not evidence of an old one.
+    monkeypatch.setattr(cli, "probe_version", lambda command: "")
+    assert cli.sissiz_too_old() == ""
+
+
+def test_sissiz_version_is_checked_only_for_a_run_that_simulates_with_it(monkeypatch) -> None:
+    asked: list[str] = []
+
+    def fake_probe(command: str) -> str:
+        asked.append(command)
+        return "SISSIz v 0.1.0"
+
+    monkeypatch.setattr(cli, "probe_version", fake_probe)
+    monkeypatch.setattr(cli, "viennarna_bindings_version", lambda: "2.7.2")
+    monkeypatch.setattr(cli, "viennarna_version_conflicts", lambda bindings, tools=None: [])
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    # No null arm: the stale SISSIz is irrelevant and must not fail the run.
+    assert cli.check_dependencies(null_method=None) == 0
+    # The column-shuffling backend does not use SISSIz either.
+    assert cli.check_dependencies(null_method="rnazRandomizeAln") == 0
+    # Selecting it is what makes its version matter.
+    assert cli.check_dependencies(null_method="sissiz") == 2
+    assert any("SISSIz" in command for command in asked)
+
+
 def test_check_deps_refuses_an_outdated_viennarna(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "viennarna_bindings_version", lambda: "2.6.4")
     monkeypatch.setattr(cli, "viennarna_version_conflicts", lambda bindings, tools=None: [])

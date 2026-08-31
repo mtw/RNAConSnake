@@ -158,7 +158,7 @@ reproducible calibration jobs.
 
 ```bash
 # one-off: fetch the sources conda cannot supply
-git clone https://github.com/mtw/SISSIz ~/src/SISSIz
+git clone --branch 0.2.0 https://github.com/mtw/SISSIz ~/src/SISSIz
 
 cd container
 SISSIZ_SRC=~/src/SISSIz ./prepare-context.sh
@@ -199,7 +199,7 @@ two pieces do not and must be installed by hand:
 
 | tool | source |
 | --- | --- |
-| `SISSIz` | <https://github.com/mtw/SISSIz> — build from source; required for the null-model arm |
+| `SISSIz` | <https://github.com/mtw/SISSIz>, release **0.2.0** — build from source; required for the null-model arm |
 | `alifoldz.pl` | the **RNAz source tarball** (`perl/`); absent from the conda package |
 
 From conda: `RNALalifold`, `RNAalifold`, `RNAz`, `esl-reformat`, `ps2eps`,

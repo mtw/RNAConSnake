@@ -293,6 +293,11 @@ probability and the AlifoldZ z-score, and once more for the composite cascade
   The pool's SHA-256 is recorded in `summary.json` either way, so a rerun can
   be verified rather than assumed, and an unseeded backend adds a warning
   saying so.
+- **The SISSIz build is part of the null model.** Because it cannot be seeded,
+  a different SISSIz is a different simulator, not merely an older one. The
+  toolchain is pinned to release **0.2.0**; `RNAcs --check-deps` refuses an
+  older build when the run uses `--null-arm sissiz`, and the exact version is
+  recorded in `results/versions.yaml` alongside the pool hash.
 
 ## Choosing the cascade thresholds
 
