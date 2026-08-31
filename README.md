@@ -152,9 +152,10 @@ If you want to use the repository checkout without activating the virtual enviro
 
 ## Running in a container
 
-A native linux/arm64 image pins the entire toolchain, including the three tools
-that are not on any package index. This is the recommended way to run
-reproducible calibration jobs.
+An image pins the entire toolchain, including the three tools that are not on
+any package index. This is the recommended way to run reproducible calibration
+jobs. `docker build` targets the host architecture, so the same context yields a
+native image on x86_64 and on Apple Silicon.
 
 ```bash
 # one-off: fetch the sources conda cannot supply
@@ -162,13 +163,13 @@ git clone --branch 0.2.0 https://github.com/mtw/SISSIz ~/src/SISSIz
 
 cd container
 SISSIZ_SRC=~/src/SISSIz ./prepare-context.sh
-docker build --platform linux/arm64 -t rnacs:0.3.0 .
+docker build -t rnacs:0.3.0 .
 ```
 
 Run it, mounting inputs read-only and the run directory read-write:
 
 ```bash
-docker run --rm --platform linux/arm64 \
+docker run --rm \
   -v "$PWD/examples:/data:ro" \
   -v "$PWD/myrun:/work" \
   rnacs:0.3.0 \

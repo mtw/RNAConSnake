@@ -1,4 +1,5 @@
-# Conda dependencies available for linux-aarch64.
+# Conda dependencies. Every one of these resolves on both linux-64 and
+# linux-aarch64, so the same file builds a native image on either.
 #
 # NOT here, because they are absent from bioconda entirely and are installed
 # separately in the Dockerfile:
@@ -19,7 +20,8 @@ dependencies:
   - rnaz=2.1
   - infernal=1.1.5
   # Optional (do_rscape). The bioconda package is named 'rscape', not
-  # 'r-scape'; 2.0.4.a is the only version with a linux-aarch64 build.
+  # 'r-scape'. Pinned to 2.0.4.a because that is the only version with a
+  # linux-aarch64 build, and both architectures should ship the same one.
   - rscape=2.0.4.a
   - hmmer            # provides esl-reformat
   - perl

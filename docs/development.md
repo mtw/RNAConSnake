@@ -27,8 +27,12 @@ painful way to get a complete environment:
 
 ```bash
 cd container && ./prepare-context.sh
-docker build --platform linux/arm64 -t rnacs:0.3.0 .
+docker build -t rnacs:0.3.0 .
 ```
+
+The build is architecture-neutral and targets the host. On a cluster with
+Apptainer and no Docker daemon, pull the x86_64 image CI publishes instead of
+building — see [container/README.md](../container/README.md).
 
 Note that `--use-conda` does **not** work: most rules use Snakemake `run:`
 directives, which execute in the Snakemake process and cannot take per-rule

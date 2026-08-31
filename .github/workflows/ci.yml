@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+  # container-integration is skipped on pull_request, and publishing is
+  # gated on a version tag or a manual run, so both need to be startable
+  # by hand from the Actions tab.
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -94,6 +98,10 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -246,6 +254,43 @@ jobs:
               sys.exit("no RNAz report carried a Consensus MFE: nothing was actually verified")
           print(f"{checked} candidates: consensus_mfe, sci and rnazprob match RNAz's own output")
           EOF
+
+      # Clusters that have Apptainer but no Docker daemon cannot build this
+      # image themselves, so CI publishes the x86_64 one it just exercised:
+      #   apptainer pull docker://ghcr.io/<owner>/rnaconsnake:<tag>
+      # The image pushed is the same one every step above ran against -- built
+      # once, tested, then tagged. Building a second image to publish would
+      # discard that evidence.
+      #
+      # Pushes to dev publish too, not only version tags: an image has to be
+      # testable on a cluster *before* it is worth tagging a release. The
+      # workflow_dispatch arm cannot cover that on its own -- GitHub only offers
+      # a manual run once the trigger exists on the default branch (master), so
+      # it stays dormant until this file is merged there.
+      - name: Publish the tested image to ghcr.io
+        if: >-
+          startsWith(github.ref, 'refs/tags/v')
+          || github.ref == 'refs/heads/dev'
+          || github.event_name == 'workflow_dispatch'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # A version tag publishes that version; anything else publishes the
+          # commit, so an untagged build can still be pulled on a cluster. The
+          # dev- tags accumulate in the registry: delete the stale ones from the
+          # package page once a release supersedes them.
+          case "$GITHUB_REF" in
+            refs/tags/v*) tag="${GITHUB_REF#refs/tags/v}" ;;
+            *)            tag="dev-${GITHUB_SHA:0:7}" ;;
+          esac
+          # ghcr.io rejects an upper-case path; the repository name has one.
+          image="ghcr.io/$(echo "$OWNER" | tr 'A-Z' 'a-z')/rnaconsnake"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker tag rnacs:ci "$image:$tag"
+          docker push "$image:$tag"
+          echo "published $image:$tag"
 
   package-smoke:
     runs-on: ubuntu-latest

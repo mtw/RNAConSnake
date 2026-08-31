@@ -7,6 +7,16 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 ## [Unreleased]
 
 ### Added
+- **The tested x86_64 image is published to `ghcr.io`.** A cluster with
+  Apptainer and no Docker daemon cannot build the image at all, so CI now
+  pushes the one it just exercised — same image, built once, tested, then
+  tagged, rather than a second image built for the purpose. A version tag
+  publishes its version; every push to `dev` publishes `dev-<short-sha>`, so an
+  image can be tried on a cluster before a release is tagged.
+  `container/README.md` covers pulling and running it under Apptainer,
+  including `--cleanenv`, without which a `module load` on the host leaks
+  `PERL5LIB`/`PYTHONPATH` into the container and shadows the toolchain the
+  image exists to pin.
 - **R-scape ships in the container** (`rscape=2.0.4.a`), so `do_rscape: true`
   works without extending the image.
 - **SISSIz is pinned to release 0.2.0.** It is on no package index, so nothing

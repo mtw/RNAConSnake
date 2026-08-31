@@ -1,4 +1,6 @@
-# RNAcs container — linux/arm64 (Apple Silicon native).
+# RNAcs container. Architecture-neutral: the base image is multi-arch, the
+# conda environment resolves on linux-64 and linux-aarch64 alike, and SISSIz is
+# compiled in-image, so `docker build` produces a native image on either host.
 #
 # Most of the toolchain comes from conda-forge/bioconda. Three pieces do not and
 # are handled explicitly: SISSIz is absent from bioconda and is compiled from
@@ -8,8 +10,9 @@
 #
 # Build context must contain vendor/ — run container/prepare-context.sh first.
 
-# Platform is set by the build command (--platform linux/arm64); pinning it
-# here as a constant makes buildx warn.
+# Platform deliberately unpinned: `docker build` then targets the host
+# architecture, and pinning it here as a constant makes buildx warn. Pass
+# --platform on the build command only to cross-build.
 FROM mambaorg/micromamba:1.5.8
 
 USER root

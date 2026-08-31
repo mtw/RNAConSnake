@@ -1,7 +1,13 @@
 # RNAcs container
 
-Native **linux/arm64** image for running the calibrated screen on Apple Silicon.
-Built for distributing long calibration runs across machines.
+Image pinning the whole toolchain, for running the calibrated screen off the
+development machine. Nothing in the Dockerfile is architecture-specific: the
+base image is multi-arch and the one tool built from source, SISSIz, is
+compiled in-image, so the same context builds a native **linux/amd64** image on
+an x86_64 host and a native **linux/arm64** one on Apple Silicon.
+
+On a cluster with Apptainer but no Docker daemon, do not build at all — pull
+the x86_64 image CI publishes. See [Running under Apptainer](#running-under-apptainer).
 
 ## Why a container
 
@@ -26,8 +32,14 @@ image without extending it, though the default configuration leaves it off.
 ```bash
 cd container
 ./prepare-context.sh        # gathers SISSIz source + the two perl helpers
-docker build --platform linux/arm64 -t rnacs:0.3.0 .
+docker build -t rnacs:0.3.0 .
 ```
+
+With no `--platform`, this builds natively for the host architecture, which is
+what you want: an emulated build compiles SISSIz under QEMU, and SISSIz is what
+simulates the null alignments. To cross-build anyway — an x86_64 image on
+Apple Silicon, say — use `docker buildx build --platform linux/amd64` and
+expect tens of minutes.
 
 `prepare-context.sh` collects three things that are not on any package index
 and must already be present on the build machine:
@@ -64,7 +76,7 @@ copies, so nothing third-party is redistributed through this repository.
 ## Run
 
 ```bash
-docker run --rm --platform linux/arm64 \
+docker run --rm \
   -v "$PWD/examples:/data:ro" \
   -v "$PWD/runs/myrun:/work" \
   rnacs:0.3.0 \
@@ -84,12 +96,79 @@ owned by root on the host.
 
 ## Distributing to other machines
 
-`docker save` / `docker load` moves the built image without rebuilding:
+`docker save` / `docker load` moves the built image without rebuilding, as long
+as both hosts are the same architecture:
 
 ```bash
 docker save rnacs:0.3.0 | gzip -1 | ssh <host> 'gunzip | docker load'
-ssh <host> 'docker run --rm --platform linux/arm64 rnacs:0.3.0 --check-deps'
+ssh <host> 'docker run --rm rnacs:0.3.0 --check-deps'
 ```
+
+## Running under Apptainer
+
+Cluster nodes typically have no Docker daemon and no root, so the image is not
+built there — CI builds an x86_64 image, runs the real toolchain through it,
+and pushes the *tested* image to ghcr.io. Pull that:
+
+```bash
+apptainer pull rnacs_0.3.0.sif docker://ghcr.io/mtw/rnaconsnake:0.3.0
+apptainer run --cleanenv rnacs_0.3.0.sif --check-deps
+```
+
+A version tag publishes its version (`0.3.0`); every push to `dev` publishes
+`dev-<short-sha>`. Untagged builds exist so an image can be tried on a cluster
+before a release is tagged — pull the `dev-` tag matching the commit you want:
+
+```bash
+apptainer pull rnacs_dev.sif docker://ghcr.io/mtw/rnaconsnake:dev-1c94c92
+```
+
+A ghcr.io package is **private on first push**, so that `pull` fails with an
+unhelpful `unauthorized` until the package's visibility is set to public (GitHub
+→ the package page → Package settings). To keep it private instead,
+authenticate on the cluster with a personal access token carrying
+`read:packages`:
+
+```bash
+export APPTAINER_DOCKER_USERNAME=<github-user>
+export APPTAINER_DOCKER_PASSWORD=<token>
+```
+
+`--check-deps` is worth running before anything long: it reports the ViennaRNA
+and SISSIz versions the image resolved and verifies that the ViennaRNA binaries
+and the Python module are one build.
+
+```bash
+apptainer run --cleanenv \
+  --bind "$PWD/examples:/data:ro" \
+  --bind "$PWD/runs/ebov:/work" \
+  rnacs_0.3.0.sif \
+  --input-alignment /data/all_JEVG_3UTR.relabel.stk \
+  --output-dir /work \
+  --maxbpspan 100 --cores 10 --no-progress \
+  --null-arm sissiz --null-replicates 100
+```
+
+Four differences from the `docker run` above, all of which matter here:
+
+- **`--cleanenv` is not optional.** Apptainer exports the host environment into
+  the container by default, so a `module load` that set `PERL5LIB`,
+  `PYTHONPATH` or a conda prefix will shadow the image's own toolchain — the
+  image would no longer be pinning what it claims to pin. `--cleanenv` is what
+  makes the run reproducible.
+- **You run as yourself**, not root. The `getpwuid()` failure that `--user`
+  causes under Docker does not arise: Apptainer binds the host `/etc/passwd`.
+  Outputs in the bound run directory are owned by you rather than by root.
+- **The image filesystem is read-only.** Everything the workflow writes goes to
+  the bound `/work`, which is fine; if some tool insists on writing elsewhere
+  in the image, add `--writable-tmpfs`.
+- **The working directory is the host's, not the image's `/work`.** Always pass
+  `--output-dir` explicitly, and bind the run directory rather than relying on
+  the `WORKDIR`.
+
+Create the run directory before binding it — Apptainer will not create a bind
+target that does not exist. Under a scheduler, keep `--cores` at or below the
+cores the job was allocated.
 
 ## Reproducibility caveats when splitting work across machines
 
