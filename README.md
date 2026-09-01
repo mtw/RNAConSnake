@@ -2,7 +2,7 @@
 
 # RNAConSnake
 
-RNAConSnake is a workflow for discovering and prioritizing locally conserved RNA secondary structure candidates from multiple-sequence alignments.
+RNAConSnake is a workflow for discovering and prioritizing locally conserved RNA secondary structure candidates from multiple sequence alignments.
 
 It combines `RNALalifold` candidate discovery with per-candidate filtering, conservation scoring, covariation analysis, structure prediction, and structured result export. RNAConSnake is intended as the scientific computation layer: it produces candidate alignments, figures, metrics, and summary tables, but it does not generate browser-style HTML reports.
 
