@@ -2,9 +2,9 @@
 
 # RNAConSnake
 
-RNAConSnake is a workflow for discovering and prioritizing locally conserved RNA secondary structure candidates from multiple-sequence alignments. The command-line tool is called `RNAcs`.
+RNAConSnake is a workflow for discovering and prioritizing locally conserved RNA secondary structure candidates from multiple sequence alignments. The command-line tool is called `RNAcs`.
 
-It combines `RNALalifold` candidate discovery with per-candidate filtering, conservation scoring, covariation analysis, structure prediction, and structured result export. RNAConSnake is intended as the scientific computation layer: it produces candidate alignments, figures, metrics, and summary tables, but it does not generate browser-style HTML reports.
+It combines `RNALalifold` candidate discovery with per-candidate filtering, conservation scoring, covariation analysis, structure prediction, and structured result export. RNAConSnake is intended as the scientific computation layer that produces candidate alignments, figures, metrics, and summary tables.
 
 RNAConSnake is released under the GNU Affero General Public License v3 or later (AGPL-3.0-or-later).
 
@@ -44,7 +44,7 @@ For a workflow-oriented overview, see [`docs/pipeline_summary.md`](docs/pipeline
 
 ## De-replicating overlapping windows
 
-RNALalifold reports every locally stable structure, so one real element comes
+RNALalifold reports every locally stable consensus structure, so one element may come
 back many times: once near its true extent, and again as shorter windows over
 its individual stable helices. Those fragments score well in their own right,
 which is what makes a raw ranked list hard to read.
@@ -61,9 +61,7 @@ The exact procedure is specified in
 
 ## Null-model calibration
 
-Without a null model, "stringent filtering" is not quantified anywhere: nothing
-says how many candidates would survive the same cascade by chance. The
-calibration arm runs the *identical* rule DAG over simulated alignments that
+The calibration arm runs the *identical* rule DAG over simulated alignments that
 preserve phylogeny, base and dinucleotide composition, gap structure and mean
 pairwise identity but carry no real structural signal, and turns the resulting
 score distributions into empirical FDR / q-values.
@@ -87,8 +85,8 @@ See [`docs/usage.md`](docs/usage.md) for the full option set.
 
 ## Is the alignment screenable?
 
-A local structure screen is blind where most sequences are gaps: no consensus
-can be folded, so no candidate is reported — indistinguishable in the output
+A local structure screen is blind where most sequences are gaps. In such a scenario no consensus
+can be folded, and no candidate is reported. This is indistinguishable in the output
 from a genuine absence of structure. Every run therefore writes
 `generated_files/alignment_screenability.tsv`, giving per-window occupancy and
 mean pairwise identity, and warning where the screen could not have looked.
