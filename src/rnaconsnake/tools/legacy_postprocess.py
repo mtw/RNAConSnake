@@ -91,10 +91,44 @@ def cmd_extract_alifoldz(args: argparse.Namespace) -> int:
 
 def cmd_extract_rscape(args: argparse.Namespace) -> int:
     text = Path(args.input).read_text(encoding="utf-8") if Path(args.input).exists() else ""
-    match = re.search(r"^#\s*BPAIRS observed to covary\s+(\d+)\s*$", text, flags=re.MULTILINE)
-    count = match.group(1) if match else ""
-    write_json(args.output, {"rscape_covary_count": count})
+    stats = _parse_rscape_power_file(text)
+    write_json(args.output, stats)
     return 0
+
+
+def _parse_rscape_power_file(text: str) -> dict[str, str]:
+    """Extract all R-scape statistics from .power file output."""
+    stats = {}
+    patterns = [
+        (r"^#\s*BPAIRS observed to covary\s+(\d+)", "rscape_covary_count"),
+        (r"^#\s*BPAIRS in consensus structure\s+(\d+)", "rscape_covary_in_structure"),
+        (r"^#\s*Average raw score\s+([\d.]+)", "rscape_avg_raw_score"),
+        (r"^#\s*Average conditional probability\s+([\d.]+)", "rscape_avg_confidence"),
+        (r"^#\s*Mutual information bits\s+([\d.]+)", "rscape_mutual_info"),
+        (r"^#\s*Significant positive correlation\s+(\d+)", "rscape_significant_pairs"),
+    ]
+    for pattern, key in patterns:
+        match = re.search(pattern, text, re.MULTILINE)
+        stats[key] = match.group(1) if match else ""
+
+    # Compute quality flag based on confidence and mutual information thresholds
+    try:
+        count = int(stats.get("rscape_covary_count", 0) or 0)
+        confidence = float(stats.get("rscape_avg_confidence", 0) or 0.0)
+        mi = float(stats.get("rscape_mutual_info", 0) or 0.0)
+
+        if count >= 2 and confidence >= 0.5 and mi > 0.1:
+            stats["rscape_quality_flag"] = "pass"
+        elif count < 2:
+            stats["rscape_quality_flag"] = "insufficient_pairs"
+        elif confidence < 0.5:
+            stats["rscape_quality_flag"] = "low_confidence"
+        else:
+            stats["rscape_quality_flag"] = "low_information"
+    except (ValueError, TypeError):
+        stats["rscape_quality_flag"] = "parse_error"
+
+    return stats
 
 
 # A Clustal sequence line: name, whitespace, then residues/gaps only.

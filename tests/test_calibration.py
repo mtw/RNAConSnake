@@ -208,7 +208,7 @@ def test_calibration_summary_records_every_clustering_parameter(tmp_path: Path) 
 
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "rnazRandomizeAln", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=True,
@@ -234,7 +234,7 @@ def test_calibrate_writes_funnel_qvalues_and_summary(tmp_path: Path) -> None:
 
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "rnazRandomizeAln", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=True,
@@ -272,7 +272,7 @@ def test_calibrate_is_reproducible_for_identical_inputs(tmp_path: Path) -> None:
         "null_000": {100: _write_summary_csv(tmp_path / "n0.csv", _candidate_rows(0.30, -0.5, "0"))},
         "null_001": {100: _write_summary_csv(tmp_path / "n1.csv", _candidate_rows(0.95, -3.0, "1"))},
     }
-    thresholds = Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2)
+    thresholds = Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2)
     for tag in ["a", "b"]:
         calibrate(
             arm_inputs=arm_inputs,
@@ -306,7 +306,7 @@ def test_calibrate_warns_when_collapse_ratio_diverges_between_arms(tmp_path: Pat
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "sissiz", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=False,
@@ -326,7 +326,7 @@ def test_calibrate_rejects_stage_one_looser_than_reported_threshold(tmp_path: Pa
     with pytest.raises(ValueError, match="stage1_rnaz_prob"):
         calibrate(
             arm_inputs=arm_inputs,
-            thresholds=Thresholds(0.9, -2.0, 1, 0.95, 1, 0.2),
+            thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.95, 1, 0.2),
             null_metadata={"method": "sissiz", "seed": 1, "warnings": []},
             output_dir=tmp_path / "calibration",
             two_stage=True,
@@ -345,7 +345,7 @@ def test_calibrate_treats_stage_one_skips_as_failing_alifoldz(tmp_path: Path) ->
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "sissiz", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=True,
@@ -364,7 +364,7 @@ def test_calibrate_drops_rscape_from_cascade_when_it_never_ran(tmp_path: Path) -
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "sissiz", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=True,
@@ -386,7 +386,7 @@ def test_calibrate_keeps_rscape_in_cascade_when_it_ran(tmp_path: Path) -> None:
     }
     summary = calibrate(
         arm_inputs=arm_inputs,
-        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2),
+        thresholds=Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2),
         null_metadata={"method": "sissiz", "seed": 1, "warnings": []},
         output_dir=tmp_path / "calibration",
         two_stage=True,
@@ -619,7 +619,7 @@ def test_threshold_sweep_honours_the_representative_rule(tmp_path: Path) -> None
     ]
 
     def survivors(rule: str) -> int:
-        base = Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2, "containment", 0.9, 0, 0.8, rule)
+        base = Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2, "containment", 0.9, 0, 0.8, rule)
         arm_inputs = {
             "real": {100: _write_summary_csv(tmp_path / f"real_{rule}.csv", rows)},
             "null_000": {100: _write_summary_csv(tmp_path / f"null_{rule}.csv", [])},

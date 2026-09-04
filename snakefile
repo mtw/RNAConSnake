@@ -1004,6 +1004,8 @@ if NULL_ARM_ENABLED:
                 "--rnaz-prob-threshold", str(CALIBRATION.rnaz_prob_threshold),
                 "--alifoldz-threshold", str(CALIBRATION.alifoldz_threshold),
                 "--rscape-min-pairs", str(CALIBRATION.rscape_min_pairs),
+                "--rscape-min-confidence", str(CALIBRATION.rscape_min_confidence),
+                "--rscape-min-mutual-info", str(CALIBRATION.rscape_min_mutual_info),
                 "--stage1-rnaz-prob", str(CALIBRATION.stage1_rnaz_prob),
                 "--locus-min-overlap", str(CALIBRATION.locus_min_overlap),
                 "--collapse-ratio-tolerance", str(CALIBRATION.collapse_ratio_tolerance),

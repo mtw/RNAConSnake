@@ -298,10 +298,18 @@ def test_legacy_postprocess_removed_render_reports_subcommand(tmp_path: Path) ->
     assert "write-summary-outputs" in result.stderr
 
 
-def test_extract_rscape_reads_covary_count(tmp_path: Path) -> None:
-    power = tmp_path / "one.power"
-    out = tmp_path / "one.rscape.json"
-    power.write_text("# BPAIRS observed to covary 1\n", encoding="utf-8")
+def test_extract_rscape_parses_all_six_statistics(tmp_path: Path) -> None:
+    power = tmp_path / "full.power"
+    out = tmp_path / "full.rscape.json"
+    power.write_text(
+        "# BPAIRS observed to covary 15\n"
+        "# BPAIRS in consensus structure 12\n"
+        "# Average raw score 0.75\n"
+        "# Average conditional probability 0.68\n"
+        "# Mutual information bits 1.23\n"
+        "# Significant positive correlation 8\n",
+        encoding="utf-8",
+    )
 
     subprocess.run(
         [
@@ -318,12 +326,112 @@ def test_extract_rscape_reads_covary_count(tmp_path: Path) -> None:
         env=subprocess_env(),
     )
 
-    assert '"rscape_covary_count": "1"' in read_text(out)
+    output = read_text(out)
+    assert '"rscape_covary_count": "15"' in output
+    assert '"rscape_covary_in_structure": "12"' in output
+    assert '"rscape_avg_raw_score": "0.75"' in output
+    assert '"rscape_avg_confidence": "0.68"' in output
+    assert '"rscape_mutual_info": "1.23"' in output
+    assert '"rscape_significant_pairs": "8"' in output
+    assert '"rscape_quality_flag": "pass"' in output
 
 
-def test_extract_rscape_reads_zero_covary_count(tmp_path: Path) -> None:
-    power = tmp_path / "zero.power"
-    out = tmp_path / "zero.rscape.json"
+def test_extract_rscape_quality_flag_insufficient_pairs(tmp_path: Path) -> None:
+    power = tmp_path / "low.power"
+    out = tmp_path / "low.rscape.json"
+    power.write_text(
+        "# BPAIRS observed to covary 1\n"
+        "# BPAIRS in consensus structure 1\n"
+        "# Average raw score 0.80\n"
+        "# Average conditional probability 0.70\n"
+        "# Mutual information bits 0.50\n"
+        "# Significant positive correlation 1\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.legacy_postprocess",
+            "extract-rscape",
+            "--input",
+            str(power),
+            "--output",
+            str(out),
+        ],
+        check=True,
+        env=subprocess_env(),
+    )
+
+    assert '"rscape_quality_flag": "insufficient_pairs"' in read_text(out)
+
+
+def test_extract_rscape_quality_flag_low_confidence(tmp_path: Path) -> None:
+    power = tmp_path / "lowconf.power"
+    out = tmp_path / "lowconf.rscape.json"
+    power.write_text(
+        "# BPAIRS observed to covary 5\n"
+        "# BPAIRS in consensus structure 4\n"
+        "# Average raw score 0.40\n"
+        "# Average conditional probability 0.35\n"
+        "# Mutual information bits 0.30\n"
+        "# Significant positive correlation 3\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.legacy_postprocess",
+            "extract-rscape",
+            "--input",
+            str(power),
+            "--output",
+            str(out),
+        ],
+        check=True,
+        env=subprocess_env(),
+    )
+
+    assert '"rscape_quality_flag": "low_confidence"' in read_text(out)
+
+
+def test_extract_rscape_quality_flag_low_information(tmp_path: Path) -> None:
+    power = tmp_path / "lowinfo.power"
+    out = tmp_path / "lowinfo.rscape.json"
+    power.write_text(
+        "# BPAIRS observed to covary 3\n"
+        "# BPAIRS in consensus structure 3\n"
+        "# Average raw score 0.60\n"
+        "# Average conditional probability 0.55\n"
+        "# Mutual information bits 0.05\n"
+        "# Significant positive correlation 2\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "rnaconsnake.tools.legacy_postprocess",
+            "extract-rscape",
+            "--input",
+            str(power),
+            "--output",
+            str(out),
+        ],
+        check=True,
+        env=subprocess_env(),
+    )
+
+    assert '"rscape_quality_flag": "low_information"' in read_text(out)
+
+
+def test_extract_rscape_handles_missing_statistics(tmp_path: Path) -> None:
+    power = tmp_path / "partial.power"
+    out = tmp_path / "partial.rscape.json"
     power.write_text("# BPAIRS observed to covary 0\n", encoding="utf-8")
 
     subprocess.run(
@@ -341,30 +449,10 @@ def test_extract_rscape_reads_zero_covary_count(tmp_path: Path) -> None:
         env=subprocess_env(),
     )
 
-    assert '"rscape_covary_count": "0"' in read_text(out)
-
-
-def test_extract_rscape_returns_empty_without_covary_line(tmp_path: Path) -> None:
-    power = tmp_path / "one.power"
-    out = tmp_path / "one.rscape.json"
-    power.write_text("# no covary summary here\n", encoding="utf-8")
-
-    subprocess.run(
-        [
-            PYTHON,
-            "-m",
-            "rnaconsnake.tools.legacy_postprocess",
-            "extract-rscape",
-            "--input",
-            str(power),
-            "--output",
-            str(out),
-        ],
-        check=True,
-        env=subprocess_env(),
-    )
-
-    assert '"rscape_covary_count": ""' in read_text(out)
+    output = read_text(out)
+    assert '"rscape_covary_count": "0"' in output
+    assert '"rscape_covary_in_structure": ""' in output
+    assert '"rscape_quality_flag": "insufficient_pairs"' in output
 
 
 def test_failed_alifoldz_fallback_is_non_numeric(tmp_path: Path) -> None:
@@ -452,10 +540,10 @@ def test_write_summary_outputs_preserves_rscape_zero_and_na(tmp_path: Path) -> N
     assert "rscape 0" in log_text
     assert "rec_na" in log_text
     assert "rscape NA" in log_text
-    assert "rec_zero,2,12,1,1,0,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
-    assert "rec_na,2,12,1,1,NA,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
-    assert "| rec_zero | 2 | 12 | 1 | 1 | 0 | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
-    assert "| rec_na | 2 | 12 | 1 | 1 | NA | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
+    assert "rec_zero,2,12,1,1,0,,,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
+    assert "rec_na,2,12,1,1,NA,,,0.95,0.58,-14.10,-3.21,<<>>" in csv_text
+    assert "| rec_zero | 2 | 12 | 1 | 1 | 0 |  |  | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
+    assert "| rec_na | 2 | 12 | 1 | 1 | NA |  |  | 0.95 | 0.58 | -14.10 | -3.21 | <<>> |" in md_text
     assert "<<>>" in log_text
 
 

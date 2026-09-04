@@ -340,6 +340,8 @@ def _candidate_rows(prob: float, alifoldz: float, rscape: str, count: int = 4) -
                 "rnazprob": f"{prob:.4f}",
                 "alifoldzscore": f"{alifoldz:.4f}",
                 "rscape_covary_count": rscape,
+                "rscape_avg_confidence": "0.65" if rscape != "NA" else "",
+                "rscape_mutual_info": "0.20" if rscape != "NA" else "",
                 "nrseq": "6",
                 "alilen": "100",
             }
@@ -527,7 +529,7 @@ def _sweep_arm_inputs(tmp_path: Path, real_rows, null_rows_per_arm):
 def _sweep_base():
     from rnaconsnake.tools.calibration import Thresholds
 
-    return Thresholds(0.9, -2.0, 1, 0.5, 1, 0.2, "containment", 0.9, 120, 0.8)
+    return Thresholds(0.9, -2.0, 1, 0.5, 0.1, 0.5, 1, 0.2, "containment", 0.9, 120, 0.8)
 
 
 def _locus(locus_id, start, end, prob="0.99"):

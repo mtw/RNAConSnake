@@ -64,6 +64,8 @@ class Thresholds:
     rnaz_prob: float
     alifoldz: float
     rscape_min_pairs: int
+    rscape_min_confidence: float
+    rscape_min_mutual_info: float
     stage1_rnaz_prob: float
     locus_min_overlap: int
     collapse_ratio_tolerance: float
@@ -92,6 +94,8 @@ class WindowRecord:
     rnazprob: float | None
     alifoldz: float | None
     rscape: int | None
+    rscape_confidence: float | None
+    rscape_mutual_info: float | None
     nrseq: str
     alilen: str
 
@@ -128,6 +132,8 @@ def window_record(row: dict[str, str], arm: str, wlen: int) -> WindowRecord:
         rnazprob=_to_float(row.get("rnazprob")),
         alifoldz=_to_float(row.get("alifoldzscore")),
         rscape=_to_int(row.get("rscape_covary_count")),
+        rscape_confidence=_to_float(row.get("rscape_avg_confidence")),
+        rscape_mutual_info=_to_float(row.get("rscape_mutual_info")),
         nrseq=(row.get("nrseq") or "").strip(),
         alilen=(row.get("alilen") or "").strip(),
     )
@@ -150,7 +156,11 @@ class LocusRecord:
         return self.rep.alifoldz is not None and self.rep.alifoldz <= thresholds.alifoldz
 
     def passes_rscape(self, thresholds: Thresholds) -> bool:
-        return self.rep.rscape is not None and self.rep.rscape >= thresholds.rscape_min_pairs
+        return (
+            self.rep.rscape is not None and self.rep.rscape >= thresholds.rscape_min_pairs
+            and self.rep.rscape_confidence is not None and self.rep.rscape_confidence >= thresholds.rscape_min_confidence
+            and self.rep.rscape_mutual_info is not None and self.rep.rscape_mutual_info >= thresholds.rscape_min_mutual_info
+        )
 
     def oriented(self, score: str) -> float | None:
         """Score oriented so that larger is always more significant."""
@@ -504,6 +514,8 @@ def calibrate(
             "rnaz_prob": thresholds.rnaz_prob,
             "alifoldz": thresholds.alifoldz,
             "rscape_min_pairs": thresholds.rscape_min_pairs,
+            "rscape_min_confidence": thresholds.rscape_min_confidence,
+            "rscape_min_mutual_info": thresholds.rscape_min_mutual_info,
             "stage1_rnaz_prob": thresholds.stage1_rnaz_prob,
             "locus_min_overlap": thresholds.locus_min_overlap,
             "dereplicate_method": thresholds.dereplicate_method,
@@ -568,6 +580,8 @@ def main() -> int:
     parser.add_argument("--rnaz-prob-threshold", type=float, required=True)
     parser.add_argument("--alifoldz-threshold", type=float, required=True)
     parser.add_argument("--rscape-min-pairs", type=int, default=1)
+    parser.add_argument("--rscape-min-confidence", type=float, default=0.5)
+    parser.add_argument("--rscape-min-mutual-info", type=float, default=0.1)
     parser.add_argument("--stage1-rnaz-prob", type=float, default=0.5)
     parser.add_argument("--locus-min-overlap", type=int, default=1)
     parser.add_argument("--dereplicate-method", default="containment")
@@ -592,6 +606,8 @@ def main() -> int:
             rnaz_prob=args.rnaz_prob_threshold,
             alifoldz=args.alifoldz_threshold,
             rscape_min_pairs=args.rscape_min_pairs,
+            rscape_min_confidence=args.rscape_min_confidence,
+            rscape_min_mutual_info=args.rscape_min_mutual_info,
             stage1_rnaz_prob=args.stage1_rnaz_prob,
             locus_min_overlap=args.locus_min_overlap,
             collapse_ratio_tolerance=args.collapse_ratio_tolerance,

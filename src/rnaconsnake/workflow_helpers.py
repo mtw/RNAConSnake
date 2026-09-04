@@ -17,6 +17,8 @@ SUMMARY_FIELDS = [
     "maxcovarval",
     "maxcovarcount",
     "rscape_covary_count",
+    "rscape_avg_confidence",
+    "rscape_mutual_info",
     "rnazprob",
     "sci",
     "consensus_mfe",
@@ -140,6 +142,8 @@ class CalibrationSettings:
     rnaz_prob_threshold: float
     alifoldz_threshold: float
     rscape_min_pairs: int
+    rscape_min_confidence: float
+    rscape_min_mutual_info: float
     stage1_rnaz_prob: float
     locus_min_overlap: int
     collapse_ratio_tolerance: float
@@ -161,6 +165,8 @@ class CalibrationSettings:
                 raw.get("alifoldz_threshold", config.get("cm_alifoldz_threshold", -2.0))
             ),
             rscape_min_pairs=int(raw.get("rscape_min_pairs", 1)),
+            rscape_min_confidence=float(raw.get("rscape_min_confidence", 0.5)),
+            rscape_min_mutual_info=float(raw.get("rscape_min_mutual_info", 0.1)),
             stage1_rnaz_prob=float(raw.get("stage1_rnaz_prob", 0.5)),
             locus_min_overlap=int(raw.get("locus_min_overlap", 1)),
             collapse_ratio_tolerance=float(raw.get("collapse_ratio_tolerance", 0.2)),
@@ -176,6 +182,8 @@ class CalibrationSettings:
             "rnaz_prob_threshold": self.rnaz_prob_threshold,
             "alifoldz_threshold": self.alifoldz_threshold,
             "rscape_min_pairs": self.rscape_min_pairs,
+            "rscape_min_confidence": self.rscape_min_confidence,
+            "rscape_min_mutual_info": self.rscape_min_mutual_info,
             "stage1_rnaz_prob": self.stage1_rnaz_prob,
             "locus_min_overlap": self.locus_min_overlap,
             "collapse_ratio_tolerance": self.collapse_ratio_tolerance,
