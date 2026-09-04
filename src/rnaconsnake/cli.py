@@ -748,6 +748,45 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
     return returncode
 
 
+def _validate_run(
+    args: argparse.Namespace,
+    configfile: str,
+    include_rscape: bool,
+    effective_null: object,
+    configured_tools: dict[str, str],
+) -> int:
+    """Validate run preconditions. Return 0 if OK, or error code."""
+    if not args.input_alignment:
+        print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
+        return 2
+    if args.benchmark and not null_arm_enabled(effective_null):
+        print(
+            "--benchmark scores the calibrated loci, so it needs the null-model arm. "
+            "Add --null-arm sissiz (or set null.method in the config file).",
+            file=sys.stderr,
+        )
+        return 2
+    aln_path = Path(args.input_alignment)
+    if not aln_path.exists():
+        print(f"Input alignment not found: {aln_path}", file=sys.stderr)
+        return 2
+    n_seq = _count_sequences_in_alignment(aln_path)
+    if n_seq < 3:
+        print(
+            f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. "
+            f"See {aln_path}.",
+            file=sys.stderr,
+        )
+        return 2
+    null_method = requested_null_method(effective_null)
+    dep_status = check_dependencies(
+        include_rscape=include_rscape,
+        null_method=null_method,
+        configured_tools=configured_tools,
+    )
+    return dep_status
+
+
 def _count_sequences_in_alignment(path: Path) -> int:
     """Count sequences in a Stockholm or Clustal alignment file."""
     text = path.read_text(encoding="utf-8", errors="replace")
@@ -846,39 +885,11 @@ def main() -> int:
             null_method=null_method,
             configured_tools=configured_tools,
         )
-    if not args.input_alignment:
-        print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
-        return 2
-    if args.benchmark and not null_arm_enabled(effective_null):
-        # The recovery table scores results/calibration/qvalues.tsv, which only
-        # the null arm produces; without it snakemake fails with a missing-rule
-        # error that says nothing about the cause.
-        print(
-            "--benchmark scores the calibrated loci, so it needs the null-model arm. "
-            "Add --null-arm sissiz (or set null.method in the config file).",
-            file=sys.stderr,
-        )
-        return 2
-    # Validate minimum sequence count before workflow starts
-    aln_path = Path(args.input_alignment)
-    if not aln_path.exists():
-        print(f"Input alignment not found: {aln_path}", file=sys.stderr)
-        return 2
-    n_seq = _count_sequences_in_alignment(aln_path)
-    if n_seq < 3:
-        print(
-            f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. "
-            f"See {aln_path}.",
-            file=sys.stderr,
-        )
-        return 2
-    dep_status = check_dependencies(
-        include_rscape=include_rscape,
-        null_method=null_method,
-        configured_tools=configured_tools,
+    validation_status = _validate_run(
+        args, configfile, include_rscape, effective_null, configured_tools
     )
-    if dep_status != 0:
-        return dep_status
+    if validation_status != 0:
+        return validation_status
 
     env = os.environ.copy()
     env.setdefault("PYTHONWARNINGS", "ignore:invalid escape sequence:SyntaxWarning")
