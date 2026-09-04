@@ -4,7 +4,7 @@ All notable changes to this project should be documented in this file.
 
 The format is based on Keep a Changelog, and this project aims to use Semantic Versioning.
 
-## [0.3.0] - 2026-08-28
+## [0.3.0] - 2026-09-04
 
 ### Added
 - Null-model calibration arm: `--null-arm` with SISSIz (default) or `rnazRandomizeAln`; empirical q-values in `results/calibration/`
