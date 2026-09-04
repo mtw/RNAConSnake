@@ -212,7 +212,7 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
     input_alignment = tmp_path / "my_input.stk"
     export_dir = tmp_path / "bundle"
     input_alignment.write_text(
-        "# STOCKHOLM 1.0\n#=GF ID dummy_input\nseq1 ACGU\n//\n",
+        "# STOCKHOLM 1.0\n#=GF ID dummy_input\nseq1 ACGU\nseq2 ACGU\nseq3 ACGU\n//\n",
         encoding="utf-8",
     )
 
@@ -317,7 +317,7 @@ def test_cli_workflow_smoke_test_with_fake_rnalalifold(tmp_path: Path) -> None:
 def test_cli_workflow_smoke_test_accepts_clustal_input(tmp_path: Path) -> None:
     input_alignment = tmp_path / "my_input.aln"
     input_alignment.write_text(
-        "CLUSTAL W\n\nseq1 ACGU\nseq2 ACGU\n***\n",
+        "CLUSTAL W\n\nseq1 ACGU\nseq2 ACGU\nseq3 ACGU\n***\n",
         encoding="utf-8",
     )
 
