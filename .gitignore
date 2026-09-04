@@ -60,9 +60,6 @@ export_*/
 # ad-hoc analysis output
 ebov_5prime/
 
-# kept locally, not part of the public release
-ARCHITECTURE.md
-
 # Coverage artifacts
 .coverage
 .coverage.*
