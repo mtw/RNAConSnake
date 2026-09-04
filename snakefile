@@ -78,7 +78,7 @@ STAGE1_RNAZ_PROB = CALIBRATION.stage1_rnaz_prob
 ALIFOLDZ_SEED = config.get("alifoldz_seed")
 DEREPLICATE_METHOD = CALIBRATION.dereplicate_method
 PAIR_CONTAINMENT = CALIBRATION.pair_containment
-EMIT_VERSIONS = bool(config.get("emit_versions", True)) or NULL_ARM_ENABLED
+EMIT_VERSIONS = bool(config.get("emit_versions", False)) or NULL_ARM_ENABLED
 BENCHMARK_TRUTH_SETTING = config.get(
     "benchmark_truth", "resources/benchmark/flavivirus_elements.tsv"
 )
