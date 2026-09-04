@@ -102,8 +102,6 @@ class NullSettings:
         if method not in NULL_METHODS:
             raise ValueError(f"Unknown null.method {method!r}. Expected one of: " + ", ".join(NULL_METHODS))
         replicates = int(raw.get("replicates", 10))
-        if method != "none" and replicates <= 0:
-            raise ValueError(f"--null-arm {method} requires --null-replicates > 0, got {replicates}")
         if replicates > 1000:
             import warnings
             warnings.warn(f"--null-replicates {replicates} is very large; this may take a very long time to run", UserWarning)

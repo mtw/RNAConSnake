@@ -850,6 +850,16 @@ def main() -> int:
     if not args.input_alignment:
         print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
         return 2
+    if args.benchmark and not null_arm_enabled(effective_null):
+        # The recovery table scores results/calibration/qvalues.tsv, which only
+        # the null arm produces; without it snakemake fails with a missing-rule
+        # error that says nothing about the cause.
+        print(
+            "--benchmark scores the calibrated loci, so it needs the null-model arm. "
+            "Add --null-arm sissiz (or set null.method in the config file).",
+            file=sys.stderr,
+        )
+        return 2
     # Validate minimum sequence count before workflow starts
     aln_path = Path(args.input_alignment)
     if not aln_path.exists():
@@ -860,16 +870,6 @@ def main() -> int:
         print(
             f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. "
             f"See {aln_path}.",
-            file=sys.stderr,
-        )
-        return 2
-    if args.benchmark and not null_arm_enabled(effective_null):
-        # The recovery table scores results/calibration/qvalues.tsv, which only
-        # the null arm produces; without it snakemake fails with a missing-rule
-        # error that says nothing about the cause.
-        print(
-            "--benchmark scores the calibrated loci, so it needs the null-model arm. "
-            "Add --null-arm sissiz (or set null.method in the config file).",
             file=sys.stderr,
         )
         return 2
