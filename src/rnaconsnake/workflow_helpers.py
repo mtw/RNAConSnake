@@ -48,7 +48,7 @@ class WorkflowSettings:
         maxbpspan_vals = [int(value) for value in config.get("maxbpspan", [100, 200])]
         for val in maxbpspan_vals:
             if val <= 0 or val > 10000:
-                raise ValueError(f"--maxbpspan {val} out of bounds: must be 1–10000 nt")
+                raise ValueError(f"--maxbpspan {val} out of bounds: must be 1-10000 nt")
         return cls(
             input_alignment=config.get("input_alignment"),
             maxbpspan=maxbpspan_vals,
@@ -106,7 +106,11 @@ class NullSettings:
         replicates = int(raw.get("replicates", 10))
         if replicates > 1000:
             import warnings
-            warnings.warn(f"--null-replicates {replicates} is very large; this may take a very long time to run", UserWarning)
+            msg = (
+                f"--null-replicates {replicates} is very large; "
+                "this may take a very long time to run"
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
         return cls(
             method=method,
             replicates=replicates,
