@@ -779,12 +779,11 @@ def _validate_run(
         )
         return 2
     null_method = requested_null_method(effective_null)
-    dep_status = check_dependencies(
+    return check_dependencies(
         include_rscape=include_rscape,
         null_method=null_method,
         configured_tools=configured_tools,
     )
-    return dep_status
 
 
 def _count_sequences_in_alignment(path: Path) -> int:
