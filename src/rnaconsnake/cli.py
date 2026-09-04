@@ -748,6 +748,31 @@ def run_with_progress(cmd: list[str], env: dict[str, str]) -> int:
     return returncode
 
 
+def _count_sequences_in_alignment(path: Path) -> int:
+    """Count sequences in a Stockholm or Clustal alignment file."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix.lower() == ".aln":
+        # Clustal: sequence lines begin with a name (not spaces or *, conservation line)
+        count = 0
+        for line in text.split("\n"):
+            if not line or line.startswith(" ") or line.startswith("*"):
+                continue
+            if line.startswith("CLUSTAL") or line.strip() == "":
+                continue
+            count += 1
+        return count
+    else:
+        # Stockholm: sequence lines begin with a non-whitespace character before a space
+        count = set()
+        for line in text.split("\n"):
+            if not line or line.startswith("#") or line.startswith("//"):
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2 and not parts[0].startswith("#"):
+                count.add(parts[0])
+        return len(count)
+
+
 def requested_null_method(effective_null: object) -> str | None:
     """The null backend this run needs a dependency for, or ``None``.
 
@@ -824,6 +849,19 @@ def main() -> int:
         )
     if not args.input_alignment:
         print("Missing required --input-alignment /path/to/input_alignment.{stk,aln}", file=sys.stderr)
+        return 2
+    # Validate minimum sequence count before workflow starts
+    aln_path = Path(args.input_alignment)
+    if not aln_path.exists():
+        print(f"Input alignment not found: {aln_path}", file=sys.stderr)
+        return 2
+    n_seq = _count_sequences_in_alignment(aln_path)
+    if n_seq < 3:
+        print(
+            f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. "
+            f"See {aln_path}.",
+            file=sys.stderr,
+        )
         return 2
     if args.benchmark and not null_arm_enabled(effective_null):
         # The recovery table scores results/calibration/qvalues.tsv, which only

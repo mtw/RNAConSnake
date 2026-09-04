@@ -43,9 +43,13 @@ class WorkflowSettings:
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> WorkflowSettings:
+        maxbpspan_vals = [int(value) for value in config.get("maxbpspan", [100, 200])]
+        for val in maxbpspan_vals:
+            if val <= 0 or val > 10000:
+                raise ValueError(f"--maxbpspan {val} out of bounds: must be 1–10000 nt")
         return cls(
             input_alignment=config.get("input_alignment"),
-            maxbpspan=[int(value) for value in config.get("maxbpspan", [100, 200])],
+            maxbpspan=maxbpspan_vals,
             lalifold_threads=int(config.get("lalifold_threads", 1)),
             remove_gaponly_gapratio=float(config.get("remove_gaponly_gapratio", 0.5)),
             remove_gaponly_max_n=int(config.get("remove_gaponly_max_n", 0)),
@@ -97,9 +101,15 @@ class NullSettings:
         method = str(raw.get("method", "none"))
         if method not in NULL_METHODS:
             raise ValueError(f"Unknown null.method {method!r}. Expected one of: " + ", ".join(NULL_METHODS))
+        replicates = int(raw.get("replicates", 10))
+        if method != "none" and replicates <= 0:
+            raise ValueError(f"--null-arm {method} requires --null-replicates > 0, got {replicates}")
+        if replicates > 1000:
+            import warnings
+            warnings.warn(f"--null-replicates {replicates} is very large; this may take a very long time to run", UserWarning)
         return cls(
             method=method,
-            replicates=int(raw.get("replicates", 10)),
+            replicates=replicates,
             seed=int(raw.get("seed", 20261101)),
             two_stage=bool(raw.get("two_stage", True)),
             pool_file=_optional_path(raw.get("pool_file")),
@@ -519,7 +529,7 @@ def initial_alignment_input(input_alignment: str | None) -> list[str]:
     if not input_alignment:
         raise ValueError(
             "Missing required config value 'input_alignment'. "
-            "Use rnaconsnake-run --input-alignment /path/to/input_alignment.{stk,aln}"
+            "Use RNAcs --input-alignment /path/to/input_alignment.{stk,aln}"
         )
     return [str(input_alignment)]
 
@@ -528,7 +538,7 @@ def initial_alignment_format_code(input_alignment: str | None) -> str:
     if not input_alignment:
         raise ValueError(
             "Missing required config value 'input_alignment'. "
-            "Use rnaconsnake-run --input-alignment /path/to/input_alignment.{stk,aln}"
+            "Use RNAcs --input-alignment /path/to/input_alignment.{stk,aln}"
         )
     suffix = Path(input_alignment).suffix.lower()
     if suffix == ".aln":
