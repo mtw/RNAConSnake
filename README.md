@@ -2,7 +2,10 @@
 
 # RNAConSnake
 
-Workflow for discovering and prioritizing conserved RNA secondary structure in multiple sequence alignments. Combines RNALalifold discovery with filtering (RNAz, AlifoldZ, covariation), de-replication, and optional empirical q-values via null-model calibration.
+Workflow for discovering and prioritizing conserved RNA secondary structure in
+multiple sequence alignments. Combines RNALalifold discovery with filtering
+(RNAz, AlifoldZ, covariation), de-replication, and optional empirical q-values
+via null-model calibration.
 
 ## Quick start
 
@@ -43,7 +46,9 @@ Two tools are not on package indices and must be built by hand:
 - **SISSIz 0.2.0** (<https://github.com/mtw/SISSIz>) — for null-model arm
 - **alifoldz.pl** — from RNAz source tarball
 
-Note: Snakemake's `--use-conda` flag is not supported in this workflow (tools must be pre-installed on PATH). See `environment.yaml` for conda packages, or use the container (see [`container/README.md`](container/README.md)).
+Note: Snakemake's `--use-conda` flag is not supported in this workflow (tools
+must be pre-installed on PATH). See `environment.yaml` for conda packages, or
+use the container (see [`container/README.md`](container/README.md)).
 
 ## Documentation
 

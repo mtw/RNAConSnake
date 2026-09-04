@@ -1,6 +1,8 @@
 # De-replication of overlapping windows
 
-RNALalifold reports every locally stable structure. One element appears many times: once at true extent, and as shorter windows over its helices. De-replication groups these and reports one representative per locus.
+RNALalifold reports every locally stable structure. One element may appear many
+times: once at true extent, and as shorter windows over its
+helices. De-replication groups these and reports one representative per locus.
 
 ## Output
 
@@ -31,11 +33,15 @@ Two windows group when:
 | `overlap` | share ≥1 alignment column |
 | `none` | never |
 
-`containment` is the default. Substructure grouping uses default 0.9 base-pair overlap threshold; **Container guard:** Long windows cannot absorb short ones beyond `max_container_width` (default 120 nt). Prevents a 200-nt window over three hairpins from collapsing them into one locus.
+`containment` is the default. Substructure grouping uses default 0.9 base-pair
+overlap threshold; **Container guard:** Long windows cannot absorb short ones
+beyond `max_container_width` (default 120 nt). Prevents a 200-nt window over
+three hairpins from collapsing them into one locus.
 
 ## Representative selection
 
-Per locus, by: descending `rnazprob`, then `alifoldzscore` (more negative better), then candidate name. Deterministic across runs.
+Per locus, by: descending `rnazprob`, then `alifoldzscore` (more negative
+better), then candidate name. Deterministic across runs.
 
 ## Caveats
 
@@ -55,4 +61,5 @@ python -m rnaconsnake.tools.dereplicate \
   --label my_run
 ```
 
-Thresholds: default 0.9 pair-containment overlap for substructure method, default 1 locus-minimum-overlap for grouping.
+Thresholds: default 0.9 pair-containment overlap for substructure method,
+default 1 locus-minimum-overlap for grouping.

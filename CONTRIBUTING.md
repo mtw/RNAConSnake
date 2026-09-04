@@ -43,4 +43,5 @@ pytest -v -k null_arm_smoke
 python -m build
 ```
 
-Root `snakefile` and `config.yaml` are source of truth; packaged copies generated at build time. Keep tests green before opening a PR.
+Root `snakefile` and `config.yaml` are source of truth; packaged copies
+generated at build time. Keep tests green before opening a PR.

@@ -35,7 +35,9 @@ RNAcs --show-tool-paths
 
 ## Tests
 
-Split by area in [`tests/`](../tests). Fixtures in `tests/fixtures/` (synthetic) and `tests/fixtures/real/` (curated from real data). Smoke test stubs the external toolchain; CI includes real-toolchain tier.
+Split by area in [`tests/`](../tests). Fixtures in `tests/fixtures/` (synthetic)
+and `tests/fixtures/real/` (curated from real data). Smoke test stubs the
+external toolchain; CI includes real-toolchain tier.
 
 Verify run consistency across two completed runs:
 
@@ -58,7 +60,9 @@ Modules under `src/rnaconsnake/tools/`, each runnable as `python -m rnaconsnake.
 
 ## Null-model arm
 
-Rules never hardcode output prefixes; all use `A()` which prepends `arms/{arm}/` when the arm is enabled. Checkpoint lookups via `checkpoint_wildcards()`. No rule duplicates.
+Rules never hardcode output prefixes; all use `A()` which prepends `arms/{arm}/`
+when the arm is enabled. Checkpoint lookups via `checkpoint_wildcards()`. No
+rule duplicates.
 
 Verify byte-identical behavior when disabled:
 

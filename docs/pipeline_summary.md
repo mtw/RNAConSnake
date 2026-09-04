@@ -42,11 +42,15 @@ results/calibration/flavivirus_recovery.tsv                # recovery vs q-value
 
 ## De-replication
 
-RNALalifold reports overlapping windows. De-replication groups by containment (default) and reports one per locus. Collapse ratio (real vs null) checked; >20% divergence flags the summary. Details: [`dereplication.md`](dereplication.md).
+RNALalifold reports overlapping windows. De-replication groups by containment
+(default) and reports one per locus. Collapse ratio (real vs null) checked; >20%
+divergence flags the summary. Details: [`dereplication.md`](dereplication.md).
 
 ## Null-model calibration
 
-Runs the same DAG on shuffled alignments. Score distributions → empirical FDR and q-values. Two-stage mode: AlifoldZ only on stage-one survivors (FDR then conditional).
+Runs the same DAG on shuffled alignments. Score distributions → empirical FDR
+and q-values. Two-stage mode: AlifoldZ only on stage-one survivors (FDR then
+conditional).
 
 ## Reproducibility
 
