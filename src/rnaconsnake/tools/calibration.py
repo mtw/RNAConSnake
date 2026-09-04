@@ -156,10 +156,14 @@ class LocusRecord:
         return self.rep.alifoldz is not None and self.rep.alifoldz <= thresholds.alifoldz
 
     def passes_rscape(self, thresholds: Thresholds) -> bool:
+        if self.rep.rscape is None or self.rep.rscape_confidence is None:
+            return False
+        if self.rep.rscape_mutual_info is None:
+            return False
         return (
-            self.rep.rscape is not None and self.rep.rscape >= thresholds.rscape_min_pairs
-            and self.rep.rscape_confidence is not None and self.rep.rscape_confidence >= thresholds.rscape_min_confidence
-            and self.rep.rscape_mutual_info is not None and self.rep.rscape_mutual_info >= thresholds.rscape_min_mutual_info
+            self.rep.rscape >= thresholds.rscape_min_pairs
+            and self.rep.rscape_confidence >= thresholds.rscape_min_confidence
+            and self.rep.rscape_mutual_info >= thresholds.rscape_min_mutual_info
         )
 
     def oriented(self, score: str) -> float | None:

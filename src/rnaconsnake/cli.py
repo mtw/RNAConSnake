@@ -755,22 +755,21 @@ def _count_sequences_in_alignment(path: Path) -> int:
         # Clustal: sequence lines begin with a name (not spaces or *, conservation line)
         count = 0
         for line in text.split("\n"):
-            if not line or line.startswith(" ") or line.startswith("*"):
+            if not line or line.startswith((" ", "*")):
                 continue
             if line.startswith("CLUSTAL") or line.strip() == "":
                 continue
             count += 1
         return count
-    else:
-        # Stockholm: sequence lines begin with a non-whitespace character before a space
-        count = set()
-        for line in text.split("\n"):
-            if not line or line.startswith("#") or line.startswith("//"):
-                continue
-            parts = line.split(None, 1)
-            if len(parts) == 2 and not parts[0].startswith("#"):
-                count.add(parts[0])
-        return len(count)
+    # Stockholm: sequence lines begin with a non-whitespace character before a space
+    count = set()
+    for line in text.split("\n"):
+        if not line or line.startswith(("#", "//")):
+            continue
+        parts = line.split(None, 1)
+        if len(parts) == 2 and not parts[0].startswith("#"):
+            count.add(parts[0])
+    return len(count)
 
 
 def requested_null_method(effective_null: object) -> str | None:
