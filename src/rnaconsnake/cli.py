@@ -773,8 +773,7 @@ def _validate_run(
     n_seq = _count_sequences_in_alignment(aln_path)
     if n_seq < 3:
         print(
-            f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. "
-            f"See {aln_path}.",
+            f"Input alignment has {n_seq} sequence(s), but RNAConSnake requires at least 3. See {aln_path}.",
             file=sys.stderr,
         )
         return 2
@@ -884,9 +883,7 @@ def main() -> int:
             null_method=null_method,
             configured_tools=configured_tools,
         )
-    validation_status = _validate_run(
-        args, configfile, include_rscape, effective_null, configured_tools
-    )
+    validation_status = _validate_run(args, configfile, include_rscape, effective_null, configured_tools)
     if validation_status != 0:
         return validation_status
 

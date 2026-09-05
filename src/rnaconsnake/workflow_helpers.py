@@ -106,10 +106,8 @@ class NullSettings:
         replicates = int(raw.get("replicates", 10))
         if replicates > 1000:
             import warnings
-            msg = (
-                f"--null-replicates {replicates} is very large; "
-                "this may take a very long time to run"
-            )
+
+            msg = f"--null-replicates {replicates} is very large; this may take a very long time to run"
             warnings.warn(msg, UserWarning, stacklevel=2)
         return cls(
             method=method,
