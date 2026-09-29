@@ -18,7 +18,6 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - Export bundle schema 1.1.0: locus and q-value columns; `dereplication`/`calibration` manifest blocks
 - Input format detection: `.stk` uses `-f S`, `.aln` uses `-f C` in RNALalifold invocation
 - Image published to `ghcr.io` on every `dev` push and version tag; Apptainer support documented
-- R-scape integrated as first-class cascade filter: extracts all 6 covariation statistics (covary_count, in_structure, avg_raw_score, avg_confidence, mutual_info, significant_pairs) with quality_flag logic; cascade now enforces `rscape_min_pairs AND rscape_min_confidence AND rscape_min_mutual_info` (default 1, 0.5, 0.1 respectively)
 - R-scape included in container (`rscape=2.0.4.a`)
 - SISSIz pinned to release 0.2.0; `--check-deps` enforces and reports version
 - Export bundle schema 1.2.0: constrained refolds exported; `input_alignment_type` recorded
@@ -31,7 +30,7 @@ The format is based on Keep a Changelog, and this project aims to use Semantic V
 - Defaults: `alifoldz_seed` set; `dereplicate.max_container_width` 120; `strip_aln` upper-cases sequences
 - `{candidate}.refold.json` → `generated_files/consensus/{candidate}.consensus.json`; `extract-refold` → `extract-consensus`
 - Linting and formatting: Ruff on CI and in `pyproject.toml` (110-column width)
-- Tests: 196 tests at 92% coverage; CI includes container build with real toolchain
+- Tests: 220 tests; CI includes container build with real toolchain
 - Test suite split by area under `tests/` with shared helpers in `tests/helpers.py`
 - `results/versions.yaml` written with `yaml.safe_dump`; PyYAML declared as dependency
 - Benchmark recovery table: `reciprocal_overlap` moved beside `overlap_fraction`

@@ -1,22 +1,12 @@
 #!/bin/bash
-# Local CI checks before pushing to master/dev
-# Run: ./scripts/check-before-push.sh
-
+# Mirrors the CI lint and test jobs. Run: ./scripts/check-before-push.sh
 set -e
 
-echo "Running pre-push checks..."
-echo
-
-# Lint
-echo "1. Linting with Ruff..."
-python -m ruff check src tests
-echo "✓ Lint passed"
-echo
-
-# Tests
-echo "2. Running pytest (full suite)..."
+echo "1. ruff check"
+python -m ruff check .
+echo "2. ruff format --check"
+python -m ruff format --check .
+echo "3. pytest"
 python -m pytest --tb=short -q
-echo "✓ Tests passed"
-echo
 
-echo "All checks passed! Safe to push."
+echo "All checks passed."
